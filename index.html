@@ -1,0 +1,2200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base target="_blank">
+<title>Dark Pink: Reversing an APT Attack Chain (Workshop)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* === INFRASTRUCTURE STYLES — customize colors via CSS custom properties === */
+
+.viz-menu {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10000;
+    font-family: inherit;
+}
+
+.viz-menu-toggle {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--border, #e2e8f0);
+    background: var(--surface, #fff);
+    color: var(--text-secondary, #64748b);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.viz-menu-toggle:hover {
+    background: var(--surface-hover, #f8fafc);
+    border-color: var(--border-strong, #cbd5e1);
+    transform: scale(1.05);
+}
+
+.viz-menu-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 200px;
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+    pointer-events: none;
+    transition: opacity 0.15s, transform 0.15s;
+}
+.viz-menu.open .viz-menu-panel {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.viz-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-primary, #0f172a);
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s;
+    font-family: inherit;
+}
+.viz-menu-item:hover {
+    background: var(--surface-hover, #f1f5f9);
+}
+
+.viz-menu-icon {
+    width: 20px;
+    text-align: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+/* === Scroll-triggered reveal animations === */
+[data-animate] {
+    opacity: 0;
+    transition-property: opacity, transform, filter;
+    transition-duration: 0.6s;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-animate="fade-up"] { transform: translateY(20px); }
+[data-animate="fade-down"] { transform: translateY(-20px); }
+[data-animate="fade-left"] { transform: translateX(-20px); }
+[data-animate="fade-right"] { transform: translateX(20px); }
+[data-animate="scale-up"] { transform: scale(0.95); }
+[data-animate="blur-in"] { filter: blur(8px); }
+
+[data-animate].is-visible {
+    opacity: 1;
+    transform: none;
+    filter: none;
+}
+
+/* Print styles */
+@media print {
+    .viz-menu { display: none !important; }
+    body { background: white !important; color: black !important; }
+    .dark-mode { all: unset; }
+    .card, .section, section { break-inside: avoid; }
+    .animate-in { opacity: 1 !important; animation: none !important; }
+    [data-animate] { opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; }
+    @page { margin: 1.5cm; }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    [data-animate] {
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+        transition: none !important;
+    }
+}
+</style>
+<style>
+:root {
+    --bg: #f0ebff;
+    --surface: #ffffff;
+    --surface-hover: #e6ddff;
+    --text-primary: #1a1038;
+    --text-secondary: #4a3d80;
+    --text-tertiary: #6f64a3;
+    --primary: #5b2fd0;
+    --primary-dark: #3f1fa0;
+    --on-primary: #ffffff;
+    --accent: #138c9c;
+    --boss: #d1166b;
+    --border: #cbbdf5;
+    --border-strong: #9c88e0;
+    --grid: rgba(91, 47, 208, 0.07);
+    --glow: #d4c6ff;
+}
+body.dark-mode {
+    --bg: #0d0820;
+    --surface: #1a1236;
+    --surface-hover: #281c52;
+    --text-primary: #efe9ff;
+    --text-secondary: #bfb2e8;
+    --text-tertiary: #8f82c4;
+    --primary: #9b73ff;
+    --primary-dark: #5d3fc2;
+    --on-primary: #0d0820;
+    --accent: #3fd0de;
+    --boss: #ff4fa3;
+    --border: #3a2a74;
+    --border-strong: #5a45a8;
+    --grid: rgba(155, 115, 255, 0.09);
+    --glow: #2a1260;
+}
+
+* { box-sizing: border-box; }
+html, body {
+    margin: 0; padding: 0;
+    height: 100vh; width: 100vw;
+    overflow: hidden;
+    color: var(--text-primary);
+    font-family: 'Pixelify Sans', monospace;
+    background:
+        linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px,
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px,
+        radial-gradient(ellipse at 82% 8%, var(--glow), transparent 55%),
+        radial-gradient(ellipse at 10% 95%, var(--glow), transparent 50%),
+        var(--bg);
+}
+/* pixel ground strip */
+body::after {
+    content: '';
+    position: fixed; left: 0; right: 0; bottom: 0; height: 5vh;
+    border-top: 4px solid var(--text-primary);
+    background: repeating-linear-gradient(90deg, var(--primary) 0 16px, var(--primary-dark) 16px 32px);
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+    position: fixed; top: 1rem; left: 1.5rem; z-index: 900;
+    display: flex; align-items: center; gap: 1rem;
+    font-family: 'Press Start 2P', monospace; font-size: 0.6rem;
+    color: var(--text-primary);
+}
+.hud .lbl { display: flex; flex-direction: column; gap: 0.45rem; }
+.hp {
+    width: min(34vw, 480px); height: 18px;
+    border: 4px solid var(--text-primary); background: var(--surface);
+    position: relative;
+}
+.hp i {
+    position: absolute; inset: 0; width: 100%;
+    background: var(--boss);
+    transition: width 0.6s steps(10);
+}
+.hp::after {
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(90deg, transparent 0 18px, var(--surface) 18px 20px);
+}
+
+/* ---------- slides ---------- */
+.slide {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column; justify-content: center;
+    padding: 12vh 8vw 10vh;
+    overflow: hidden; z-index: 2;
+}
+.slide.active { display: flex; }
+.tag {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(0.55rem, 0.9vw, 0.75rem);
+    background: var(--primary); color: var(--on-primary);
+    padding: 0.6em 0.9em; width: fit-content;
+    box-shadow: 4px 4px 0 var(--text-primary);
+    margin-bottom: 1.3rem;
+}
+h1, h2 {
+    font-family: 'Press Start 2P', monospace;
+    line-height: 1.4; margin: 0 0 1.3rem;
+    text-shadow: 3px 3px 0 var(--border);
+}
+h1 { font-size: clamp(1.8rem, 5.4vw, 4.4rem); color: var(--boss); }
+h2 { font-size: clamp(1rem, 2.3vw, 1.9rem); }
+p.sub { font-size: clamp(1.1rem, 2vw, 1.7rem); color: var(--text-secondary); margin: 0 0 1rem; line-height: 1.4; }
+.cols { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 3vw; align-items: center; }
+ul.pts { list-style: none; padding: 0; margin: 0; font-size: clamp(1rem, 1.6vw, 1.35rem); line-height: 1.45; }
+ul.pts li { padding-left: 1.6em; position: relative; margin: 0.55em 0; }
+ul.pts li::before {
+    content: ''; position: absolute; left: 0; top: 0.5em;
+    width: 0.7em; height: 0.7em; background: var(--primary);
+    box-shadow: 2px 2px 0 var(--text-primary);
+}
+.lab {
+    margin-top: 1.2rem; padding: 0.8rem 1rem;
+    border: 4px solid var(--text-primary); background: var(--surface);
+    box-shadow: 6px 6px 0 var(--accent);
+    font-size: clamp(0.95rem, 1.4vw, 1.2rem); line-height: 1.4;
+}
+.lab .k {
+    font-family: 'Press Start 2P', monospace; font-size: 0.62rem;
+    background: var(--accent); color: #0d0820;
+    padding: 0.4em 0.7em; margin-right: 0.7em; white-space: nowrap;
+}
+.lab .hash { display: block; margin-top: 0.6rem; font-size: 0.8em; color: var(--text-tertiary); word-break: break-all; }
+.panel {
+    border: 4px solid var(--text-primary); background: var(--surface);
+    box-shadow: 8px 8px 0 var(--primary); padding: 1.1rem 1.3rem;
+    font-size: clamp(0.95rem, 1.45vw, 1.25rem); line-height: 1.4;
+}
+.panel h3 {
+    font-family: 'Press Start 2P', monospace; font-size: 0.62rem;
+    color: var(--primary); margin: 0 0 0.9rem; font-weight: 400;
+}
+.flow { display: flex; flex-direction: column; gap: 0.5rem; }
+.node { border: 3px solid var(--text-primary); background: var(--bg); padding: 0.45rem 0.8rem; }
+.node small { display: block; color: var(--text-tertiary); font-size: 0.8em; }
+.arrow { text-align: center; color: var(--primary); font-family: 'Press Start 2P', monospace; font-size: 0.7rem; }
+.chain { display: flex; flex-wrap: wrap; gap: 0.6rem 0.4rem; align-items: center; margin-top: 1.4rem; }
+.chain .node { font-size: clamp(0.95rem, 1.5vw, 1.25rem); }
+.chain .arrow { font-size: 0.9rem; }
+pre.code {
+    margin: 0; white-space: pre; overflow-x: auto;
+    font-family: 'Pixelify Sans', monospace; font-size: clamp(0.85rem, 1.3vw, 1.1rem); line-height: 1.4;
+    color: var(--text-primary);
+}
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+.chip { border: 3px solid var(--text-primary); background: var(--surface); padding: 0.2rem 0.7rem; font-size: clamp(0.9rem, 1.3vw, 1.1rem); }
+.chip.hot { background: var(--primary); color: var(--on-primary); }
+.chip.boss { background: var(--boss); color: #fff; }
+.todo { border-style: dashed; color: var(--text-secondary); }
+.stage-art { display: flex; justify-content: space-between; align-items: flex-end; gap: 2vw; margin-top: 1.4rem; }
+.hero-col, .boss-col { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.cap { font-family: 'Press Start 2P', monospace; font-size: 0.55rem; color: var(--text-secondary); }
+.spr svg { display: block; }
+.boss svg { animation: bob 1s steps(2) infinite; }
+.hero-corner { position: absolute; right: 8vw; bottom: 7vh; display: flex; align-items: flex-end; gap: 1rem; opacity: 0.95; }
+.refs { font-size: clamp(0.95rem, 1.35vw, 1.15rem); line-height: 1.5; }
+.refs a, .panel a { color: var(--primary); }
+.footer {
+    position: absolute; left: 0; right: 0; bottom: 6.5vh; text-align: center;
+    font-size: 0.7rem; color: var(--text-tertiary); line-height: 1.5;
+}
+.footer a { color: var(--text-tertiary); }
+
+/* entrance + idle animation */
+.slide.active .rv { animation: rv 0.45s steps(6) both; animation-delay: calc(var(--i, 0) * 0.08s); }
+@keyframes rv { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+
+/* ---------- phase fight slides ---------- */
+.arena {
+    /* hero sprite 228px wide, boss 288px: dash until the shears reach the boss */
+    --dash: calc(84vw - 228px - 288px + 30px);
+    position: relative; display: flex; justify-content: space-between; align-items: flex-end;
+    margin-top: 1.2rem; min-height: 330px;
+}
+.p-hero { animation: inL 0.5s steps(6) both; }
+.hero-inner { display: block; }
+.v-slash .hero-inner, .v-ko .hero-inner { animation: dash 1.3s steps(10) 0.7s both; }
+.p-boss { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 0.7rem; animation: inR 0.5s steps(6) both; }
+.abar { align-self: stretch; display: flex; flex-direction: column; gap: 0.45rem; font-family: 'Press Start 2P', monospace; font-size: 0.55rem; color: var(--text-secondary); }
+.abar .hp { width: 100%; }
+.abar .hp i { transform-origin: left; transform: scaleX(var(--f)); animation: drain 0.5s steps(5) 1.25s both; }
+.boss-body { position: relative; animation: hit 0.5s steps(5) 1.15s both; }
+.boss-body .post, .boss-body .limb { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; }
+.boss-body .post svg { animation: bob 1s steps(2) infinite; }
+/* on impact: swap to the next damage stage and send the cut limb flying */
+.slide.active .boss-body .pre { animation: swap-out 0.01s steps(1) 1.15s both; }
+.slide.active .boss-body .post { animation: swap-in 0.01s steps(1) 1.15s both; }
+.slide.active .boss-body .limb { animation: limb-fly 1.2s steps(12) 1.15s forwards; transform-origin: var(--ox) var(--oy); }
+.limb.l1 { --fx: -130px; --fr: -160deg; --ox: 15%; --oy: 45%; }
+.limb.l2 { --fx: 140px; --fr: 140deg; --ox: 85%; --oy: 65%; }
+.limb.l3 { --fx: -100px; --fr: -90deg; --ox: 15%; --oy: 85%; }
+.limb.l4 { --fx: 120px; --fr: 120deg; --ox: 85%; --oy: 85%; }
+.slide.v-beam.active .boss-body .limb { animation-name: limb-melt; transform-origin: 20% 100%; }
+@keyframes swap-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes swap-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes limb-fly {
+    0% { opacity: 1; transform: none; }
+    30% { opacity: 1; transform: translate(calc(var(--fx) * 0.5), -50px) rotate(calc(var(--fr) * 0.4)); }
+    100% { opacity: 0; transform: translate(var(--fx), 130px) rotate(var(--fr)); }
+}
+@keyframes limb-melt {
+    0% { opacity: 1; transform: none; filter: none; }
+    40% { opacity: 1; filter: hue-rotate(-55deg) saturate(2) brightness(1.4); }
+    100% { opacity: 0; transform: translateY(30px) scaleY(0.3); filter: hue-rotate(-55deg) saturate(2) brightness(1.4); }
+}
+.fx { position: absolute; opacity: 0; pointer-events: none; }
+.fx.slash { left: 0; top: 70px; animation: pop 0.5s steps(5) 1.15s both; }
+.fx.star { left: 60px; top: 130px; animation: pop 0.45s steps(4) 1.2s both; }
+.dmg {
+    position: absolute; left: 35%; top: 30px; opacity: 0;
+    font-family: 'Press Start 2P', monospace; font-size: 1rem; color: var(--boss);
+    text-shadow: 2px 2px 0 var(--text-primary);
+    animation: floatup 0.9s steps(8) 1.25s both;
+}
+/* weed-killer spray cone from the wand nozzle to the boss */
+.beam {
+    display: none; position: absolute; left: 222px; bottom: 33px; height: 48px;
+    width: calc(84vw - 366px); transform-origin: left; opacity: 0;
+    clip-path: polygon(0 42%, 100% 0, 100% 100%, 0 58%);
+    background:
+        radial-gradient(circle, #e9ffb0 0 2px, transparent 3px) 0 0 / 14px 12px,
+        repeating-linear-gradient(90deg, rgba(182,255,58,0.95) 0 10px, rgba(74,154,107,0.85) 10px 16px, rgba(233,255,176,0.9) 16px 20px);
+}
+.v-beam .beam { display: block; animation: beam 1.1s steps(8) 0.6s both; }
+.v-beam .fx.slash { display: none; }
+.slide.v-ko.active .boss-body .pre { animation: swap-out 0.01s steps(1) 1.5s both; }
+.slide.v-ko.active .boss-body .post { animation: koin 0.6s steps(6) 1.5s both; }
+.slide.v-ko.active .boss-body .limb { animation-delay: 1.5s; }
+.v-ko .boss-body .post svg { animation: none; }
+@keyframes inL { from { opacity: 0; transform: translateX(-25vw); } to { opacity: 1; transform: none; } }
+@keyframes inR { from { opacity: 0; transform: translateX(25vw); } to { opacity: 1; transform: none; } }
+@keyframes dash {
+    0% { transform: translateX(0); filter: none; }
+    30% { filter: drop-shadow(-18px 0 0 rgba(63,208,222,0.6)) drop-shadow(-36px 0 0 rgba(255,79,163,0.35)); }
+    35%, 55% { transform: translateX(var(--dash)); filter: none; }
+    75% { filter: drop-shadow(18px 0 0 rgba(63,208,222,0.45)); }
+    100% { transform: translateX(0); filter: none; }
+}
+@keyframes hit { 0%, 100% { transform: none; } 20% { transform: translateX(14px); } 40% { transform: translateX(-10px); } 60% { transform: translateX(8px); } 80% { transform: translateX(-4px); } }
+@keyframes pop { 0% { opacity: 0; } 10%, 60% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes floatup { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-70px); } }
+@keyframes drain { from { transform: scaleX(var(--f)); } to { transform: scaleX(var(--t)); } }
+@keyframes beam { 0% { opacity: 1; transform: scaleX(0); } 50% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+@keyframes fadeout { to { opacity: 0; } }
+@keyframes koin { from { opacity: 0; transform: translateY(0); } to { opacity: 1; transform: translateY(26px); } }
+@media (prefers-reduced-motion: reduce) { .slide * { animation-delay: 0s !important; } }
+
+/* ---------- navigation ---------- */
+.nav-btn {
+    position: fixed; top: 50%; transform: translateY(-50%); z-index: 1000;
+    width: 48px; height: 48px; cursor: pointer;
+    background: var(--surface); color: var(--text-primary);
+    border: 4px solid var(--text-primary); box-shadow: 4px 4px 0 var(--primary);
+    font-family: 'Press Start 2P', monospace; font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+}
+.nav-btn:hover { background: var(--primary); color: var(--on-primary); }
+.nav-btn:disabled { opacity: 0.25; cursor: default; }
+.nav-prev { left: 1rem; }
+.nav-next { right: 1rem; }
+.slide-counter {
+    position: fixed; bottom: 7vh; right: 2rem; z-index: 1000;
+    font-family: 'Press Start 2P', monospace; font-size: 0.6rem; color: var(--text-secondary);
+    background: var(--bg); padding: 0.4rem 0.6rem; border: 3px solid var(--text-primary);
+}
+.slide-progress { position: fixed; top: 0; left: 0; height: 5px; background: var(--primary); transition: width 0.3s; z-index: 1000; }
+.download-btn {
+    position: fixed; top: 1rem; right: 4rem; z-index: 1000; cursor: pointer;
+    background: var(--surface); color: var(--text-primary);
+    border: 3px solid var(--text-primary); padding: 0.45rem 0.8rem;
+    font-family: 'Press Start 2P', monospace; font-size: 0.55rem;
+}
+.download-btn:hover { background: var(--primary); color: var(--on-primary); }
+
+@media (max-width: 900px) {
+    .cols { grid-template-columns: 1fr; }
+    .hp { width: 30vw; }
+}
+@media print {
+    html, body { overflow: visible; height: auto; width: auto; }
+    body::after, .hud, .nav-btn, .slide-counter, .slide-progress, .download-btn { display: none !important; }
+    .slide { position: relative; display: flex !important; width: 100vw; height: 100vh; page-break-after: always; break-after: page; }
+    .slide .rv, .slide .arena * { animation: none !important; }
+    .slide .rv { opacity: 1 !important; }
+}
+
+/* ================= ARCADE LAYER ================= */
+/* petals + stars canvas, drawn at 1/4 resolution and upscaled for chunky pixels */
+#fxCanvas {
+    position: fixed; inset: 0; width: 100vw; height: 100vh;
+    z-index: 1; pointer-events: none; image-rendering: pixelated;
+    /* keep petals out of the reading area */
+    -webkit-mask-image: radial-gradient(ellipse 52% 46% at 42% 55%, transparent 55%, #000 100%);
+    mask-image: radial-gradient(ellipse 52% 46% at 42% 55%, transparent 55%, #000 100%);
+}
+/* CRT scanlines + vignette */
+.crt {
+    position: fixed; inset: 0; z-index: 4000; pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 3px),
+        radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,0.5) 100%);
+    animation: flicker 7s steps(1) infinite;
+}
+body:not(.dark-mode) .crt {
+    background:
+        repeating-linear-gradient(0deg, rgba(40,20,90,0.05) 0 1px, transparent 1px 3px),
+        radial-gradient(ellipse at center, transparent 62%, rgba(60,30,140,0.2) 100%);
+}
+body.no-crt .crt { display: none; }
+@keyframes flicker { 0%, 100% { opacity: 1; } 47% { opacity: 0.9; } 48% { opacity: 1; } 81% { opacity: 0.94; } 82% { opacity: 1; } }
+
+/* pixel-dissolve slide transition */
+.wipe {
+    position: fixed; inset: 0; z-index: 3000; pointer-events: none;
+    display: grid; grid-template-columns: repeat(var(--cols), 1fr); grid-template-rows: repeat(var(--rows), 1fr);
+}
+.wipe i { background: var(--primary); opacity: 0; }
+.wipe i:nth-child(3n) { background: var(--primary-dark); }
+.wipe i:nth-child(7n) { background: var(--boss); }
+.wipe.go i { animation: px-out var(--d) steps(1) both; }
+@keyframes px-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* glitching title */
+h1.glitch { position: relative; text-shadow: 3px 3px 0 var(--border), 0 0 28px rgba(255,79,163,0.45); }
+h1.glitch::before, h1.glitch::after {
+    content: attr(data-text); position: absolute; left: 0; top: 0; width: 100%;
+    text-shadow: none; pointer-events: none; clip-path: inset(100% 0 0 0);
+}
+h1.glitch::before { color: var(--accent); animation: glitch-a 3.4s steps(1) infinite; }
+h1.glitch::after { color: #ffe14a; animation: glitch-b 3.4s steps(1) infinite; }
+@keyframes glitch-a {
+    0%, 84%, 100% { clip-path: inset(100% 0 0 0); transform: none; }
+    85% { clip-path: inset(8% 0 62% 0); transform: translate(-7px, 0); }
+    88% { clip-path: inset(54% 0 22% 0); transform: translate(6px, 0); }
+    91% { clip-path: inset(30% 0 48% 0); transform: translate(-4px, 0); }
+    93% { clip-path: inset(100% 0 0 0); }
+}
+@keyframes glitch-b {
+    0%, 86%, 100% { clip-path: inset(100% 0 0 0); transform: none; }
+    87% { clip-path: inset(62% 0 10% 0); transform: translate(6px, 0); }
+    90% { clip-path: inset(18% 0 66% 0); transform: translate(-5px, 0); }
+    92% { clip-path: inset(100% 0 0 0); }
+}
+
+/* title: VS + press start */
+.vs-col { display: flex; flex-direction: column; align-items: center; gap: 1.4rem; padding-bottom: 2.2rem; }
+.vs {
+    font-family: 'Press Start 2P', monospace; font-size: clamp(1.6rem, 3.6vw, 3rem);
+    color: #ffe14a; text-shadow: 4px 4px 0 var(--boss), 8px 8px 0 #0b0618;
+    animation: vs 1.2s steps(2) infinite;
+}
+@keyframes vs { 50% { transform: scale(1.12) rotate(-4deg); } }
+.press { font-family: 'Press Start 2P', monospace; font-size: clamp(0.55rem, 0.95vw, 0.8rem); color: var(--accent); white-space: nowrap; }
+.press { animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.hero-col .spr svg { animation: bob 1.4s steps(2) infinite; animation-delay: 0.35s; }
+
+/* typed headings */
+.slide.active h2 .ch { animation: typein 0.01s steps(1) both; animation-delay: calc(0.15s + var(--c) * 0.022s); }
+.slide h2 .w { white-space: nowrap; }
+.slide.active h2::after {
+    content: ''; display: inline-block; width: 0.55em; height: 0.9em; margin-left: 0.25em;
+    background: var(--boss); vertical-align: -0.05em;
+    animation: caret 0.5s steps(1) 8 forwards;
+}
+@keyframes typein { from { visibility: hidden; } to { visibility: visible; } }
+@keyframes caret { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+/* lab boxes as RPG dialog windows */
+.lab {
+    position: relative; padding-right: 2.4rem;
+    box-shadow: 6px 6px 0 var(--accent), inset 0 0 0 3px var(--surface), inset 0 0 0 5px var(--border-strong);
+}
+.lab::after {
+    content: ''; position: absolute; right: 0.9rem; bottom: 0.7rem; width: 0; height: 0;
+    border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 9px solid var(--accent);
+    animation: nudge 0.8s steps(2) infinite;
+}
+@keyframes nudge { 50% { transform: translateY(4px); } }
+
+/* panel title bars */
+.panel h3 { display: flex; align-items: center; gap: 0.8rem; }
+.panel h3::after {
+    content: ''; flex: 1; height: 4px; opacity: 0.6;
+    background: repeating-linear-gradient(90deg, var(--primary) 0 4px, transparent 4px 8px);
+}
+pre.code::after { content: '_'; color: var(--accent); animation: blink 0.9s steps(1) infinite; }
+.chip { transition: transform 0.12s steps(2), box-shadow 0.12s steps(2); }
+.chip:hover { transform: translate(-3px, -3px); box-shadow: 3px 3px 0 var(--text-primary); }
+.chip.w1 { background: var(--primary); color: var(--on-primary); }
+.chip.w2 { background: var(--accent); color: var(--on-primary); }
+.chip.w3 { background: var(--boss); color: #fff; }
+.nav-btn:active { transform: translateY(-50%) translate(3px, 3px); box-shadow: 1px 1px 0 var(--primary); }
+
+/* HUD score */
+.hud .score { min-width: 7.5em; }
+.one-up { color: var(--boss); animation: blink 1s steps(1) infinite; }
+.score b { color: var(--accent); font-weight: 400; font-size: 0.75rem; letter-spacing: 0.08em; }
+body.konami #hpFill { background: linear-gradient(90deg, #ff4fa3, #ffe14a, #3fd0de, #9b73ff, #ff4fa3) 0 0 / 200% 100%; animation: rainbow 1s steps(8) infinite; }
+@keyframes rainbow { to { background-position: 200% 0; } }
+
+/* toast */
+.toast {
+    position: fixed; left: 50%; top: 20%; transform: translateX(-50%); z-index: 6000;
+    font-family: 'Press Start 2P', monospace; font-size: 0.75rem; line-height: 1.6;
+    padding: 0.9rem 1.2rem; background: var(--surface); color: var(--text-primary);
+    border: 4px solid var(--text-primary); box-shadow: 6px 6px 0 var(--boss);
+    opacity: 0; pointer-events: none; white-space: nowrap;
+}
+.toast.show { animation: toast 1.8s steps(1) both; }
+@keyframes toast { 0%, 99% { opacity: 1; } 100% { opacity: 0; } }
+
+/* world map (chain slide) */
+.map { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 1.4rem; padding-top: 64px; }
+.map::before {
+    content: ''; position: absolute; left: calc(100% / 14); right: calc(100% / 14); top: calc(64px + 27px); height: 6px;
+    background: repeating-linear-gradient(90deg, var(--text-tertiary) 0 10px, transparent 10px 18px);
+}
+.lvl { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; text-align: center; padding: 0 0.3rem; }
+.lvl[data-w="1"] { --w: var(--primary); }
+.lvl[data-w="2"] { --w: var(--accent); }
+.lvl[data-w="3"] { --w: var(--boss); }
+.tile {
+    position: relative; z-index: 1; width: 60px; height: 60px;
+    display: flex; align-items: center; justify-content: center;
+    border: 4px solid var(--text-primary); background: var(--w); color: var(--on-primary);
+    box-shadow: 4px 4px 0 var(--text-primary);
+    font-family: 'Press Start 2P', monospace; font-size: 0.65rem;
+}
+.tile.boss-tile { background: var(--surface); }
+.tile .star { position: absolute; top: -26px; color: #ffe14a; font-size: 0.9rem; opacity: 0; text-shadow: 2px 2px 0 #0b0618; }
+.lvl .name { font-size: clamp(0.85rem, 1.25vw, 1.1rem); line-height: 1.25; }
+.lvl .world { font-family: 'Press Start 2P', monospace; font-size: 0.5rem; color: var(--text-tertiary); }
+.slide.active .tile { animation: bump 0.3s steps(3) both; animation-delay: calc(0.9s + var(--k) * 0.45s); }
+.slide.active .tile .star { animation: starpop 0.6s steps(4) both; animation-delay: calc(0.95s + var(--k) * 0.45s); }
+@keyframes bump { 50% { transform: translateY(-10px); } }
+@keyframes starpop { 0% { opacity: 0; transform: translateY(6px); } 40%, 100% { opacity: 1; transform: none; } }
+.walker { position: absolute; top: 2px; left: calc(100% / 14); transform: translateX(-50%); z-index: 2; }
+.slide.active .walker { animation: walk 3.15s steps(6, jump-none) 0.9s both; }
+.slide.active .walker svg { animation: hop 0.45s steps(3) 0.9s 7; }
+@keyframes walk { from { left: calc(100% / 14); } to { left: calc(100% * 13 / 14); } }
+@keyframes hop { 50% { transform: translateY(-12px); } }
+
+/* fight slides: shake, flash, debris, callout */
+.slide.phase::before {
+    content: ''; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background: #fff; opacity: 0;
+}
+.slide.phase.active { animation: shake 0.45s steps(6) 1.15s both; }
+.slide.phase.active::before { animation: flash 0.3s steps(3) 1.15s forwards; }
+.slide.phase.v-ko.active { animation: shake 0.6s steps(8) 1.5s both; }
+.slide.phase.v-ko.active::before { animation: flash 0.4s steps(4) 1.5s forwards; }
+@keyframes shake {
+    0%, 100% { transform: none; }
+    20% { transform: translate(-10px, 6px); } 40% { transform: translate(8px, -6px); }
+    60% { transform: translate(-6px, -4px); } 80% { transform: translate(4px, 4px); }
+}
+@keyframes flash { 0% { opacity: 0.55; } 100% { opacity: 0; } }
+.debris { position: absolute; left: 50%; top: 45%; pointer-events: none; }
+.debris i {
+    position: absolute; width: var(--s); height: var(--s); background: var(--c); opacity: 0;
+    box-shadow: 2px 2px 0 rgba(11,6,24,0.8);
+}
+.slide.active .debris i { animation: debris 0.9s steps(9) 1.18s both; }
+.slide.v-ko.active .debris i { animation-delay: 1.5s; animation-duration: 1.2s; }
+@keyframes debris {
+    0% { opacity: 0; transform: none; }
+    5% { opacity: 1; transform: none; }
+    50% { opacity: 1; transform: translate(calc(var(--dx) * 0.7), calc(var(--dy) * 0.7 - 30px)); }
+    100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 40px)); }
+}
+.callout {
+    position: absolute; left: 50%; top: 0; z-index: 6; opacity: 0; white-space: nowrap;
+    font-family: 'Press Start 2P', monospace; font-size: clamp(1.2rem, 3vw, 2.4rem); color: #ffe14a;
+    text-shadow: 3px 3px 0 #0b0618, -3px -3px 0 #0b0618, 3px -3px 0 #0b0618, -3px 3px 0 #0b0618, 7px 7px 0 var(--boss);
+    transform: translateX(-50%);
+}
+.slide.active .callout { animation: callout 1.5s steps(10) 1.25s both; }
+.slide.v-ko.active .callout { animation: callout-stay 0.6s steps(6) 1.65s both; font-size: clamp(2rem, 6vw, 4.6rem); }
+@keyframes callout {
+    0% { opacity: 0; transform: translateX(-50%) scale(2.4); }
+    15% { opacity: 1; transform: translateX(-50%) scale(1); }
+    80% { opacity: 1; transform: translateX(-50%); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-24px); }
+}
+@keyframes callout-stay {
+    0% { opacity: 0; transform: translateX(-50%) scale(3); }
+    100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+@media (max-width: 900px) {
+    .tile { width: 44px; height: 44px; font-size: 0.5rem; }
+    .map::before { top: calc(64px + 19px); }
+    .lvl .name { font-size: 0.75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .wipe, #fxCanvas { display: none; }
+    .crt, .press, .vs, .one-up { animation: none !important; }
+}
+@media print {
+    #fxCanvas, .crt, .wipe, .toast, .callout, .debris, .press, .walker { display: none !important; }
+    .slide h2 .ch, .slide h2::after, .slide.phase, .slide.phase::before, .tile, .tile .star, h1.glitch::before, h1.glitch::after { animation: none !important; }
+    .slide h2::after { display: none; }
+    .tile .star { opacity: 1; }
+}
+</style>
+</head>
+<body class="dark-mode">
+<canvas id="fxCanvas" aria-hidden="true"></canvas>
+<div class="crt" aria-hidden="true"></div>
+<div class="wipe" id="wipe" aria-hidden="true"></div>
+<div class="toast" id="toast" role="status"></div>
+<nav class="viz-menu" id="vizMenu" aria-label="Visualization controls">
+    <button class="viz-menu-toggle" onclick="toggleMenu()" aria-label="Toggle menu" aria-expanded="false">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="5" x2="15" y2="5"/>
+            <line x1="3" y1="9" x2="15" y2="9"/>
+            <line x1="3" y1="13" x2="15" y2="13"/>
+        </svg>
+    </button>
+    <div class="viz-menu-panel" id="vizMenuPanel">
+        <button onclick="toggleTheme()" class="viz-menu-item">
+            <span class="viz-menu-icon" id="themeIcon">◐</span>
+            <span id="themeLabel">Toggle dark mode</span>
+        </button>
+        <button onclick="window.print()" class="viz-menu-item">
+            <span class="viz-menu-icon">⎙</span>
+            <span>Print / Save as PDF</span>
+        </button>
+        <button onclick="toggleFullscreen()" class="viz-menu-item">
+            <span class="viz-menu-icon" id="fsIcon">⛶</span>
+            <span id="fsLabel">Fullscreen</span>
+        </button>
+        <button onclick="toggleSfx()" class="viz-menu-item">
+            <span class="viz-menu-icon">&#9834;</span>
+            <span id="sfxLabel">Sound effects: off (M)</span>
+        </button>
+        <button onclick="toggleCrt()" class="viz-menu-item">
+            <span class="viz-menu-icon">&#9636;</span>
+            <span id="crtLabel">CRT scanlines: on (C)</span>
+        </button>
+        <hr style="border:none;border-top:1px solid var(--border,#e2e8f0);margin:2px 8px">
+        <button onclick="saveAsImage()" class="viz-menu-item" id="saveImgBtn">
+            <span class="viz-menu-icon">📷</span>
+            <span>Save as image</span>
+        </button>
+    </div>
+</nav>
+
+<div class="hud" aria-hidden="true">
+    <span class="spr" data-s="hero" data-px="2"></span>
+    <div class="lbl">
+        <span id="hudName">DARK PINK</span>
+        <div class="hp" title="Workshop progress"><i id="hpFill"></i></div>
+    </div>
+    <div class="lbl score"><span class="one-up" id="oneUp">1UP</span><b id="score">0000000</b></div>
+</div>
+<div class="slide-progress" id="progress"></div>
+<button class="download-btn" onclick="window.print()">&#8615; PDF</button>
+<button class="nav-btn nav-prev" onclick="goSlide(-1)" aria-label="Previous slide">&lt;</button>
+<button class="nav-btn nav-next" onclick="goSlide(1)" aria-label="Next slide">&gt;</button>
+<div class="slide-counter">STAGE <span id="current">1</span> / <span id="total">1</span></div>
+
+<!-- 01 TITLE -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">WORKSHOP</div>
+    <h1 class="rv glitch" style="--i:1" data-text="DARK PINK">DARK PINK</h1>
+    <p class="sub rv" style="--i:2">Reversing a Southeast Asian APT attack chain, from malicious ISO to a live Telegram bot to a YARA hunt.</p>
+    <p class="sub rv" style="--i:3">Flare VM &middot; CFF Explorer &middot; Procmon &middot; Ghidra &middot; dnSpy &middot; VirusTotal</p>
+    <div class="stage-art rv" style="--i:4">
+        <div class="hero-col"><span class="spr" data-s="hero" data-px="7"></span><span class="cap">YOU</span></div>
+        <div class="vs-col"><span class="vs">VS</span><span class="press">PRESS &#9654; TO START</span></div>
+        <div class="boss-col boss"><span class="spr" data-s="boss" data-px="6.5"></span><span class="cap">DARK PINK</span></div>
+    </div>
+</section>
+
+<!-- AUTHOR -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">PLAYER 1</div>
+    <h2 class="rv" style="--i:1">ABOUT THE AUTHOR</h2>
+    <div class="cols">
+        <ul class="pts rv" style="--i:2">
+            <li><b>Lives for the hunt.</b> Nation-state adversaries or eCrime actors, any means to expose their operations and unmask the people behind the digital veil</li>
+            <li><b>Telegram-as-a-C2.</b> Has taught conference attendees around Europe to investigate, track and lift the curtain on these operations, and released an extensive toolset targeting this C2 implementation</li>
+            <li><b>Threat Intelligence.</b> Has held various TI roles and currently works in Threat Intelligence; thrives on cybercriminal investigations</li>
+        </ul>
+        <div class="panel rv" style="--i:3">
+            <h3>PLAYER CARD</h3>
+            <div><b>Pol Thill</b></div>
+            <div>Threat Intelligence</div>
+            <div style="margin-top:0.6rem">GitHub: <a href="https://github.com/Trigleos">@Trigleos</a></div>
+            <div class="chips"><span class="chip">Nation-state</span><span class="chip">eCrime</span><span class="chip">Telegram C2</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- 02 AGENDA -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">AGENDA</div>
+    <h2 class="rv" style="--i:1">THREE MODULES, ONE ATTACK CHAIN</h2>
+    <div class="cols">
+        <ul class="pts rv" style="--i:2">
+            <li><b>Module 1: Initial loader.</b> ISO, wwlib.dll side-loading, persistence, the BuildTask payloads</li>
+            <li><b>Module 2: KamiKakaBot.</b> The infostealer and the backdoor in dnSpy</li>
+            <li><b>Module 3: Telegram C2.</b> Hunt a live bot, extract its messages, hunt with YARA on VirusTotal</li>
+            <li>Each module has hands-on labs; LLM-assisted analysis is practised in Module 1</li>
+        </ul>
+        <div class="panel rv" style="--i:3">
+            <h3>TOOLS (FLARE VM)</h3>
+            <div class="chips">
+                <span class="chip">CFF Explorer</span><span class="chip">Procmon</span><span class="chip">Ghidra</span><span class="chip">dnSpy</span>
+                <span class="chip">Detect It Easy</span><span class="chip">Python</span><span class="chip">Telegram Bot API</span>
+                <span class="chip">YARA</span><span class="chip">VirusTotal</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 03 LAB SAFETY -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">BEFORE YOU START</div>
+    <h2 class="rv" style="--i:1">LAB SAFETY</h2>
+    <div class="cols">
+        <ul class="pts rv" style="--i:2">
+            <li>Work only inside the Flare VM, on a host-only or disconnected network</li>
+            <li>Take a snapshot before every lab and revert afterwards</li>
+            <li>The sample is the <b>real Dark Pink malware</b> from the wild, not a modified copy</li>
+            <li>Its Telegram bot token has been revoked, so it can no longer reach C2; still treat it as live malware</li>
+            <li>The only live C2 is the trainer's own bot in the edited BuildTask (Lab 3); query it from the host through the Telegram Bot API</li>
+            <li>No real credentials or personal accounts in the VM</li>
+            <li>Never open a sample on your host machine</li>
+        </ul>
+        <div class="panel rv" style="--i:3">
+            <h3>LAB LAYOUT</h3>
+            <div class="flow">
+                <div class="node">Host<small>slides, notes, VirusTotal, Telegram Bot API</small></div>
+                <div class="arrow">NO SHARED FOLDERS</div>
+                <div class="node">Flare VM (snapshot)<small>samples, tools, host-only network</small></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 04 THREAT PROFILE -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">THREAT PROFILE</div>
+    <h2 class="rv" style="--i:1">WHO IS DARK PINK?</h2>
+    <div class="cols">
+        <ul class="pts rv" style="--i:2">
+            <li>Espionage-focused APT, active since mid-2021, first reported publicly by Group-IB in early 2023</li>
+            <li>Targets government, military, education, religious and non-profit organisations across APAC, with some European victims</li>
+            <li>Custom tooling: TelePowerBot, KamiKakaBot, Cucky and Ctealer stealers</li>
+            <li>Goal: document theft, messenger data and audio recordings</li>
+        </ul>
+        <div class="panel rv" style="--i:3">
+            <h3>NAMES AND LINKS</h3>
+            <div>Also tracked as <b>Saaiwc</b>.</div>
+            <div style="margin-top:0.6rem">Reported links to <b>OceanLotus / Ocean Buffalo (APT32)</b>, a Vietnam-linked group.</div>
+            <div class="chips"><span class="chip">Vendor naming differs</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- 05 CHAIN MAP -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">OVERVIEW</div>
+    <h2 class="rv" style="--i:1">THE ATTACK CHAIN WE WILL TAKE APART</h2>
+    <p class="sub rv" style="--i:2">Eight labs along the chain. By the end you will have followed the whole path, hunted the live bot and tuned a YARA rule.</p>
+    <div class="map rv" style="--i:3">
+        <span class="walker spr" data-s="hero" data-px="2.5"></span>
+        <div class="lvl" data-w="1" style="--k:0"><div class="tile">1-1<span class="star">&#9733;</span></div><span class="world">MODULE 1</span><span class="name">Phishing ISO</span></div>
+        <div class="lvl" data-w="1" style="--k:1"><div class="tile">1-2<span class="star">&#9733;</span></div><span class="world">MODULE 1</span><span class="name">WINWORD.EXE + wwlib.dll</span></div>
+        <div class="lvl" data-w="1" style="--k:2"><div class="tile">1-3<span class="star">&#9733;</span></div><span class="world">MODULE 1</span><span class="name">Drop + persist</span></div>
+        <div class="lvl" data-w="1" style="--k:3"><div class="tile">1-4<span class="star">&#9733;</span></div><span class="world">MODULE 1</span><span class="name">BuildTask payloads</span></div>
+        <div class="lvl" data-w="2" style="--k:4"><div class="tile">2-1<span class="star">&#9733;</span></div><span class="world">MODULE 2</span><span class="name">Infostealer + backdoor</span></div>
+        <div class="lvl" data-w="3" style="--k:5"><div class="tile">3-1<span class="star">&#9733;</span></div><span class="world">MODULE 3</span><span class="name">Live bot + messages</span></div>
+        <div class="lvl" data-w="3" style="--k:6"><div class="tile boss-tile"><span class="spr" data-s="boss" data-px="1"></span><span class="star">&#9733;</span></div><span class="world">MODULE 3</span><span class="name">YARA on VirusTotal</span></div>
+    </div>
+    <div class="chain rv" style="--i:4">
+        <span class="chip w1">Module 1</span><span class="chip w2">Module 2</span><span class="chip w3">Module 3</span>
+        <span class="chip">Module 1: first four stages &middot; Module 2: infostealer and backdoor &middot; Module 3: live bot and hunting</span>
+    </div>
+</section>
+
+<!-- PHASE 1 -->
+<section class="slide phase v-slash" style="--f:1.0;--t:0.75">
+    <div class="tag rv" style="--i:0">PHASE 1 OF 4</div>
+    <h2 class="rv" style="--i:1">MODULE 1: INITIAL LOADER</h2>
+    <p class="sub rv" style="--i:2">ISO, wwlib.dll side-loading, persistence and the BuildTask</p>
+    <div class="arena">
+        <div class="p-hero"><div class="hero-inner"><span class="spr" data-s="hero" data-px="6"></span></div></div>
+        <div class="beam"></div>
+        <div class="p-boss">
+            <div class="abar"><span>DARK PINK</span><div class="hp"><i></i></div></div>
+            <div class="boss-body">
+                <span class="spr boss pre" data-s="boss" data-stage="0" data-px="6"></span><span class="spr post" data-s="boss" data-stage="1" data-px="6"></span><span class="spr limb l1" data-s="boss" data-limb="0" data-px="6"></span>
+                <span class="spr fx slash" data-s="slash" data-px="8"></span>
+                <span class="spr fx star" data-s="star" data-px="6"></span>
+                <span class="dmg">-25%</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 06 ISO -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 1 &middot; INITIAL LOADER</div>
+    <h2 class="rv" style="--i:1">DELIVERY: THE MALICIOUS ISO</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>Disk images can carry files that lose Mark-of-the-Web handling on older Windows builds</li>
+                <li>Four files: a Word-looking <b>.docx.exe</b>, a PDF letter and two files marked hidden</li>
+                <li>The hidden attribute keeps the real payload out of a quick look</li>
+            </ul>
+            <div class="lab rv" style="--i:3"><span class="k">LAB 1</span>Mount the ISO, open each file in CFF Explorer and check its hashes on VirusTotal. Which file is malicious?<span class="hash">Proposed Concept Note on the AOIP-based Comprehensive Regional Architecture.iso<br>SHA-256 f9f2ff85bb4523a5ebd6e3e66f2d768596d0b52f5e03db62af70b7136c0f9d81</span></div>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>WHAT TO FIND</h3>
+<pre class="code">Proposed Concept Note ... .iso
+ |- CN AOIP-based ... (1).docx.exe
+ |- ID SOM Letter on ... .pdf
+ |- wwlib.dll                (hidden)
+ `- ~CN AOIP-based ... (1).doc (hidden)</pre>
+        </div>
+    </div>
+</section>
+
+<!-- 07 SIDELOAD -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 1 &middot; INITIAL LOADER</div>
+    <h2 class="rv" style="--i:1">DLL SIDE-LOADING: WWLIB.DLL</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>The .docx.exe hashes to the legitimate, Microsoft-signed <b>WINWORD.EXE</b></li>
+                <li>Word looks for wwlib.dll in its own folder before the system directories</li>
+                <li>wwlib.dll is not in the import table: Word loads it at runtime with LoadLibrary, so checking imports alone misses it</li>
+                <li>The malicious code runs inside a trusted, signed process</li>
+            </ul>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>EXECUTION FLOW</h3>
+            <div class="flow">
+                <div class="node">.docx.exe starts<small>really WINWORD.EXE</small></div><div class="arrow">v</div>
+                <div class="node">LoadLibrary("wwlib.dll")<small>from its own folder</small></div><div class="arrow">v</div>
+                <div class="node">Malicious wwlib.dll runs</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 08 LLM -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 1 &middot; INITIAL LOADER</div>
+    <h2 class="rv" style="--i:1">LLM-ASSISTED REVERSING</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>Give the model small, self-contained pieces: one function, not the whole sample</li>
+                <li>Good fits: explaining what a function does, decoding loops, recovering paths and registry keys</li>
+                <li>Treat the answer as a hypothesis and confirm it against Procmon, the decompiler or the files on disk</li>
+            </ul>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>PROMPT PATTERN</h3>
+<pre class="code">Context:  what the function is for
+Input:    pseudo-C from Ghidra
+Ask:      explain, then give a
+          Python decoder
+Verify:   check it against what
+          you saw on disk</pre>
+            <div class="chips"><span class="chip">Used in Labs 2 and 3</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- 09 WWLIB -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 1 &middot; INITIAL LOADER</div>
+    <h2 class="rv" style="--i:1">WWLIB.DLL: PERSISTENCE AND DROPPED FILES</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>wwlib.dll is small: two main functions do the work</li>
+                <li>Find out which files it drops, where it stores them and how it persists</li>
+                <li>Note the BuildTask file name: it is the password for the next archive</li>
+            </ul>
+            <div class="lab rv" style="--i:3"><span class="k">LAB 2</span>Work out what wwlib.dll drops, where, and how it persists. Pick a route: Procmon (fast) or Ghidra plus an LLM (deep).</div>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>TWO ROUTES</h3>
+            <div class="flow">
+                <div class="node">Fast: Procmon<small>run the .docx.exe in the VM, filter on the process, read the file and registry writes</small></div>
+                <div class="arrow">OR</div>
+                <div class="node">Deep: Ghidra + LLM<small>decompile the two main functions, ask the model what they do, confirm the paths</small></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 10 BUILDTASK -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 1 &middot; INITIAL LOADER</div>
+    <h2 class="rv" style="--i:1">THE BUILDTASK: REBUILDING KAMIKAKABOT</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>MSBuild compiles and runs inline C# tasks from a project file, so a signed Microsoft tool runs the attacker's code</li>
+                <li>Unlock the BuildTask archive with the file name from Lab&nbsp;2</li>
+                <li>This BuildTask is a trainer-edited copy that talks to a working bot; you hunt it in Module 3</li>
+                <li>It carries two KamiKakaBot payloads; rebuild them with small Python scripts, with an LLM to help read the task</li>
+            </ul>
+            <div class="lab rv" style="--i:3"><span class="k">LAB 3</span>Unlock build_task.7z, analyse the BuildTask and reconstruct its two payloads with Python.</div>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>PIPELINE</h3>
+            <div class="flow">
+                <div class="node">BuildTask<small>MSBuild project file</small></div><div class="arrow">v</div>
+                <div class="node">Find the embedded payloads</div><div class="arrow">v</div>
+                <div class="node">Decode with Python</div><div class="arrow">v</div>
+                <div class="node">Two KamiKakaBot payloads</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- PHASE 2 -->
+<section class="slide phase v-slash" style="--f:0.75;--t:0.5">
+    <div class="tag rv" style="--i:0">PHASE 2 OF 4</div>
+    <h2 class="rv" style="--i:1">MODULE 2: KAMIKAKABOT</h2>
+    <p class="sub rv" style="--i:2">The infostealer and the backdoor in dnSpy</p>
+    <div class="arena">
+        <div class="p-hero"><div class="hero-inner"><span class="spr" data-s="hero" data-px="6"></span></div></div>
+        <div class="beam"></div>
+        <div class="p-boss">
+            <div class="abar"><span>DARK PINK</span><div class="hp"><i></i></div></div>
+            <div class="boss-body">
+                <span class="spr boss pre" data-s="boss" data-stage="1" data-px="6"></span><span class="spr post" data-s="boss" data-stage="2" data-px="6"></span><span class="spr limb l2" data-s="boss" data-limb="1" data-px="6"></span>
+                <span class="spr fx slash" data-s="slash" data-px="8"></span>
+                <span class="spr fx star" data-s="star" data-px="6"></span>
+                <span class="dmg">-25%</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 10 INFOSTEALER -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 2 &middot; KAMIKAKABOT</div>
+    <h2 class="rv" style="--i:1">THE INFOSTEALER</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>The BuildTask rebuilds two .NET payloads: an infostealer and the main backdoor</li>
+                <li>.NET decompiles back to readable C#, so dnSpy gets you most of the way</li>
+                <li>Start with the infostealer: what does it go after?</li>
+            </ul>
+            <div class="lab rv" style="--i:3"><span class="k">LAB 4</span>Open the infostealer in dnSpy. Which browsers does it target?</div>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>TWO PAYLOADS</h3>
+<pre class="code">payload 1: infostealer
+   -> which browsers?
+payload 2: backdoor
+   -> which token and chat ID?</pre>
+        </div>
+    </div>
+</section>
+
+<!-- 11 BACKDOOR -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 2 &middot; KAMIKAKABOT</div>
+    <h2 class="rv" style="--i:1">THE BACKDOOR</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>The main backdoor takes its commands from the operator over Telegram</li>
+                <li>The bot token and chat ID are the keys to the operator's channel</li>
+                <li>This BuildTask was edited, so both are live: you hunt with them in Module 3</li>
+            </ul>
+            <div class="lab rv" style="--i:3"><span class="k">LAB 5</span>Open the backdoor in dnSpy. What is the bot token, and which chat ID does it report to?</div>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>WHERE IT LEADS</h3>
+            <div class="flow">
+                <div class="node">Bot token + chat ID<small>from the backdoor</small></div><div class="arrow">v</div>
+                <div class="node">Lab 6: hunt the live bot</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- PHASE 3 -->
+<section class="slide phase v-beam" style="--f:0.5;--t:0.25">
+    <div class="tag rv" style="--i:0">PHASE 3 OF 4</div>
+    <h2 class="rv" style="--i:1">MODULE 3: TELEGRAM C2 AND HUNTING</h2>
+    <p class="sub rv" style="--i:2">Live bot hunting, message extraction and YARA hunting on VirusTotal</p>
+    <div class="arena">
+        <div class="p-hero"><div class="hero-inner"><span class="spr" data-s="heroSpray" data-px="6"></span></div></div>
+        <div class="beam"></div>
+        <div class="p-boss">
+            <div class="abar"><span>DARK PINK</span><div class="hp"><i></i></div></div>
+            <div class="boss-body">
+                <span class="spr boss pre" data-s="boss" data-stage="2" data-px="6"></span><span class="spr post" data-s="boss" data-stage="3" data-px="6"></span><span class="spr limb l3" data-s="boss" data-limb="2" data-px="6"></span>
+                <span class="spr fx slash" data-s="slash" data-px="8"></span>
+                <span class="spr fx star" data-s="star" data-px="6"></span>
+                <span class="dmg">-25%</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 14 TELEGRAM C2 -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 3 &middot; TELEGRAM C2</div>
+    <h2 class="rv" style="--i:1">TELEGRAM AS C2</h2>
+    <div class="cols">
+        <ul class="pts rv" style="--i:2">
+            <li>Ordinary HTTPS to a trusted service, highly available and hard to block outright</li>
+            <li>A bot receives commands, replies and uploads files, all through the same public API</li>
+            <li>The bot token sits in the request path, so recovering it identifies the channel</li>
+            <li>Defender view: the process making the request matters more than the destination</li>
+        </ul>
+        <div class="panel rv" style="--i:3">
+            <h3>MESSAGE FLOW</h3>
+            <div class="flow">
+                <div class="node">Operator<small>writes a command to the bot chat</small></div><div class="arrow">v</div>
+                <div class="node">api.telegram.org</div><div class="arrow">v</div>
+                <div class="node">Backdoor<small>polls, decodes, runs, replies</small></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- HUNT THE LIVE BOT -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 3 &middot; TELEGRAM C2</div>
+    <h2 class="rv" style="--i:1">HUNTING THE LIVE BOT</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>The real token is revoked, but the BuildTask from Lab&nbsp;3 was edited to talk to a working bot</li>
+                <li>The token and chat ID you recovered in Lab&nbsp;5 are live: the same access as the malware to the bot, its chat and its messages</li>
+                <li>On a real case, think before you query: calls like getUpdates compete with the backdoor's own polling and can tip off the operator</li>
+            </ul>
+            <div class="lab rv" style="--i:3"><span class="k">LAB 6</span>Take the bot token from Lab 5 and identify the bot from your host with getMe.</div>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>BOT API CALLS</h3>
+<pre class="code">getMe    who is the bot?</pre>
+        </div>
+    </div>
+</section>
+
+<!-- 15 EXTRACT MESSAGES -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 3 &middot; TELEGRAM C2</div>
+    <h2 class="rv" style="--i:1">EXTRACTING THE MESSAGES</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>The Telegram Bot API is public and documented: whatever the backdoor can do with the token, so can you</li>
+                <li>Goal: get the operator's messages out of the C2 chat and into a chat you control</li>
+                <li>Read the list of available methods and pick the ones that fit, without disturbing the backdoor</li>
+            </ul>
+            <div class="lab rv" style="--i:3"><span class="k">LAB 7</span>Using the Telegram Bot API documentation, find the methods that let you extract the operator's messages, then recover them.</div>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>START HERE</h3>
+<pre class="code">core.telegram.org/bots/api
+  token    from Lab 5
+  chat ID  from Lab 5
+  method   ?</pre>
+        </div>
+    </div>
+</section>
+
+<!-- 16 YARA + VT -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">MODULE 3 &middot; HUNTING</div>
+    <h2 class="rv" style="--i:1">HUNTING WITH YARA ON VIRUSTOTAL</h2>
+    <div class="cols">
+        <div>
+            <ul class="pts rv" style="--i:2">
+                <li>You get a starter YARA rule: fill it with candidate strings from your own analysis</li>
+                <li>Good strings are ones the author is unlikely to change; a single token, or a string found in clean files, is not</li>
+                <li>Test on VirusTotal: too many hits means too generic, one hit means too specific</li>
+            </ul>
+            <div class="lab rv" style="--i:3"><span class="k">LAB 8</span>Fill the starter rule with strings from Labs 1 to 7, decide which are best to hunt on, and test your rule on VirusTotal.</div>
+        </div>
+        <div class="panel rv" style="--i:4">
+            <h3>FOR EACH STRING</h3>
+<pre class="code">stable across samples?  y/n
+in clean files?         y/n
+VirusTotal hits         n
+keep?                   y/n</pre>
+        </div>
+    </div>
+</section>
+
+<!-- PHASE 4 -->
+<section class="slide phase v-ko" style="--f:0.25;--t:0.0">
+    <div class="tag rv" style="--i:0">PHASE 4 OF 4</div>
+    <h2 class="rv" style="--i:1">ATTACK CHAIN SOLVED</h2>
+    <p class="sub rv" style="--i:2">Summary and resources</p>
+    <div class="arena">
+        <div class="p-hero"><div class="hero-inner"><span class="spr" data-s="hero" data-px="6"></span></div></div>
+        <div class="beam"></div>
+        <div class="p-boss">
+            <div class="abar"><span>DARK PINK</span><div class="hp"><i></i></div></div>
+            <div class="boss-body">
+                <span class="spr boss pre" data-s="boss" data-stage="3" data-px="6"></span><span class="spr post" data-s="boss" data-stage="4" data-ko="1" data-px="6"></span><span class="spr limb l4" data-s="boss" data-limb="3" data-px="6"></span>
+                <span class="spr fx slash" data-s="slash" data-px="8"></span>
+                <span class="spr fx star" data-s="star" data-px="6"></span>
+                <span class="dmg">-25%</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 21 TAKEAWAYS -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">SUMMARY</div>
+    <h2 class="rv" style="--i:1">WHAT YOU REVERSED TODAY</h2>
+    <div class="cols">
+        <ul class="pts rv" style="--i:2">
+            <li>Delivery and side-loading: ISO, WINWORD.EXE, wwlib.dll</li>
+            <li>Persistence and the BuildTask that rebuilds KamiKakaBot</li>
+            <li>KamiKakaBot: the infostealer's target browsers and the backdoor's token and chat ID</li>
+            <li>Telegram C2: hunted a live bot and extracted its messages</li>
+            <li>Hunting on VirusTotal with a YARA rule you tuned yourself</li>
+        </ul>
+        <div class="boss-col boss rv" style="--i:3"><span class="spr" data-s="boss" data-stage="4" data-ko="1" data-px="6"></span><span class="cap">ATTACK CHAIN SOLVED</span></div>
+    </div>
+</section>
+
+<!-- 22 REFERENCES -->
+<section class="slide">
+    <div class="tag rv" style="--i:0">RESOURCES</div>
+    <h2 class="rv" style="--i:1">REFERENCES AND COURSE FILES</h2>
+    <div class="cols">
+        <ul class="pts refs rv" style="--i:2">
+            <li>Group-IB: first public reporting on Dark Pink (January 2023) and follow-up on TelePowerBot and KamiKakaBot (May 2023)</li>
+            <li><a href="https://cyberint.com/blog/research/dark-pink-apt-attacks/">Cyberint: Dark Pink APT attacks</a></li>
+            <li><a href="https://thehackernews.com/2023/05/dark-pink-apt-group-leverages.html">The Hacker News: TelePowerBot and KamiKakaBot</a></li>
+            <li><a href="https://industrialcyber.co/news/dark-pink-apt-group-targets-military-bodies-government-development-agencies-across-apac-region/">Industrial Cyber: targets across APAC</a></li>
+            <li><a href="https://www.youtube.com/watch?v=wSmz4xyJCgA">Infosec In the City (video): Hunting for Dark Pink, Telegram C2 message extraction</a></li>
+        </ul>
+        <div class="panel rv" style="--i:3">
+            <h3>IN THIS REPO</h3>
+            <div class="chips">
+                <span class="chip">Lab guides and solutions: labs/</span><span class="chip">Samples: workshop.7z</span><span class="chip">BuildTask: build_task.7z</span>
+            </div>
+        </div>
+    </div>
+    <div class="footer">polthill &middot; 2026-10-10<br>Generated by <a href="https://fburl.com/claude-templates/k5rd6ab0">/visualize</a> claude skill</div>
+</section>
+
+<script>
+/* ---------- pixel sprites ---------- */
+const PAL = {
+    k: '#0b0618', W: '#ffffff', y: '#ffe14a', w: '#f4eefc',
+    m: '#ff4fa3', M: '#c21d7a', p: '#ff9fd0', r: '#3a0820', R: '#e8336d',
+    n: '#4a9a6b', N: '#2d6a49', g: '#b6ff3a', v: '#3fd0de',
+    Y: '#ffd23f', O: '#c98a0e', L: '#232842', G: '#3d4580', T: '#8b6df0', t: '#5a43b0',
+    x: '#ffe14a', h: '#c3c8e4', H: '#5d6aa8'
+};
+const KO_PAL = { m: '#7f6aa6', M: '#54417d', p: '#9a8cc0', n: '#6a6f57', N: '#454a38', r: '#2a2238', R: '#6a5a7a', g: '#6a6f57', w: '#cfc6e6', W: '#cfc6e6' };
+/* Dark Pink boss: a man-eating carnation, 48x48, built from layers so it can lose a limb per phase */
+const BOSS = {
+    w: 48, h: 48,
+    base: { x: 5, y: 0, rows: [
+        ".............k....kMk....k.............",
+        "............kMkk.kMMMk.kkMk............",
+        "...........kMMMMkMMMMMkMMMMk...........",
+        ".......kkk.kMMMMMMMMMMMMMMMk.kkk.......",
+        "......kMMMkkMMMMppMMMppMMMMkkMMMk......",
+        "......kMMMMMpmMMppmMmppMMmmMMMMMk......",
+        ".......kMMMMppmmmpmmmpmmmmmMMMMk.......",
+        "...kkkkkMMMmpppmmpMmppmmmmmmMMMkkkkk...",
+        "..kMMMMMppmmmppmmMMMpMMMmmmmmmmMMMMMk..",
+        "...kMMMMpppmmMMMMMMMmMMMmmmmmmmMMMMk...",
+        "...kMMMMmmppmMMMmmMmmMMmMMMmmmmMMMMk...",
+        "....kMpmmmMMMpmMpmmmmmmmMMMmmmmmmMk....",
+        ".kkkMppppmMMMMpmmmmmmmmmmmmmmmmmmmMkkk.",
+        "kMMMMMmppppMMMmmmmmmmmmmmmMMMMmmmMMMMMk",
+        ".kMMMMMmmmMMppmmmmmmmmmmmmMMMmmmMMMMMk.",
+        "..kMMMmmMMMMMmmmmmmmmmmmmmmmmmmmmMMMk..",
+        "...kppppppMMmmmmmmmmmmmmmmmMMmmmmmmk...",
+        "..kMMMmmmmmmmmmmmmmmmmmmmmMMMMMmmMMMk..",
+        ".kMMMMMmmmMMMmmmmmmmmmmmmmmMMmmmMMMMMk.",
+        "kMMMMMmpmMMMMmmmmmmmmmmmmMMMmmmmmMMMMMk",
+        ".kkkMppmmmmmmmmmmmmmmmmmmMMMMmmmmmMkkk.",
+        "....kMmmmmmmMMMmmmmmmmmMmmMMMmmmmMk....",
+        "...kMMMMmmmmMMMmMMmmMmmMMMmmmmmMMMMk...",
+        "...kMMMMmmmmmmmMMMmMMMMMMMmmmmmMMMMk...",
+        "..kMMMMMmmmmmmmMMMmMMMmmmmmmmmmMMMMMk..",
+        "...kkkkkMMMmmmmmmmmmMmmmmmmmMMMkkkkk...",
+        ".......kMMMMmmmmmmmmmmmmmmmMMMMk.......",
+        "......kMMMMMmmMMmmmMmmmMMmmMMMMMk......",
+        "......kMMMkkMMMMmmMMMmmMMMMkkMMMk......",
+        ".......kkk.kMMMMMMMMMMMMMMMk.kkk.......",
+        "...........kMMMMkMMMMMkMMMMk...........",
+        "............kMkkkkMMMkNkkMk............",
+        ".............k..knkMknNkwk.............",
+        "...............knnnknnNwk..............",
+        "...............knnnnnnNk...............",
+        "...............knnnnnNk................",
+        "..............kknnnnnNk................",
+        ".............kwwnnnnnNk................",
+        "..............kknnnnnNkkk..............",
+        "...............knnNNNNkwwk.............",
+        "..............kkNNNNNNNNk..............",
+        ".............kNNNNNNNNNNNkk............",
+        "............kNNNNNNNNNNNNNNk...........",
+        "..........kkNNNNNNNNNNNNNNNNkk.........",
+        ".........kNNNNNkNNNnkNNNkNNNNNk........",
+        "........kNNNkkkNNNkk.kNNNkkkNNNk.......",
+        ".......kNNkk.kNNNk....kNNNk.kkNNk......",
+        "......kNNk...kNNk......kNNk...kNNk....."
+    ] },
+    face: { x: 7, y: 1, rows: [
+        "................k.................",
+        "...............kyk................",
+        "................k.................",
+        "..................................",
+        "..................................",
+        ".....kk....................kk.....",
+        ".....yykkk..............kkkyy.....",
+        ".....yyyyykk..........kkyyyyy.....",
+        ".....yyyykyyk........kyykyyyy.....",
+        "......yyykyy..........yykyyy......",
+        ".......kkkk............kkkk.....k.",
+        ".k.............................kyk",
+        "kyk.............................k.",
+        ".k................................",
+        ".........WW.WW.WWrWW.WW.WW........",
+        ".........WWrWWrWWrWWrWWrWW........",
+        ".........WrrWrrWrrWrrWrrW.........",
+        ".........rrrWrrrrrrrrWrrrr........",
+        "........rrrrWrrrrrrrrWrrrrr.......",
+        "........rrrrrrrrrrrrrrrrrrr.......",
+        "........rrrrrrRRRRRRrrrrrrr.......",
+        ".........rrWrrRRRRRRWrrWrr........",
+        "..........WWrWRRRRRRWrWWr.........",
+        "..........WWrWWrWWrWWrWW..........",
+        "......k........rrrrr..............",
+        ".....kyk..................k.......",
+        "......k..................kyk......",
+        "..........................k......."
+    ] },
+    faceKo: { x: 14, y: 7, rows: [
+        "k...k..........k...k",
+        ".k.k............k.k.",
+        "..k..............k..",
+        ".k.k............k.k.",
+        "k...k..........k...k",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "....................",
+        "...WWrWWrWWrWWrWW...",
+        "...rrrrrrrrrrrrrrr..",
+        ".rrrrrrrrrrrrrrrrrrr",
+        ".rrrrrrrrrrrrrrrrrrr",
+        ".rrrrrrrrrrRRRrrrrrr",
+        "...rrrrrrrrRRRRrrr..",
+        ".....rrrrrrrRRRr....",
+        ".............RR.....",
+        ".............R......"
+    ] },
+    /* limbs in the order they are cut: snapper tentacle, leaf arm, left root claw, right root claw */
+    limbs: [
+        { x: 0, y: 13, rows: [
+            "..kkkkkkk.................",
+            ".kMMMMMMMk................",
+            "kMmmmmmmmMk...............",
+            "kMmpmmmmmMk...............",
+            "kWkWkWkWkWk...............",
+            "krrrrrrrrrk...............",
+            "kWkWkWkWkWk...............",
+            "kMmmmmmmmMk...............",
+            ".kMMMMMMMk................",
+            "..knnnkkk.................",
+            "..knNNk...................",
+            "..kNNNk...................",
+            ".knNNk....................",
+            ".kNNNk....................",
+            ".kNNNk.k.............kkk..",
+            ".kNNNnkwk.k...k....kknnnk.",
+            "..kNNNnwkkwk.kwk.kknnnnnnk",
+            "..kNNNnnkwkkkkwkknnnnnnnnk",
+            "...kNNNnnnnnnnnnnnnnnnnnnk",
+            "...kNNNNnnnnnnnnnnnnnnnNk.",
+            "....kNNNNNnnnnnnnnnnNNkk..",
+            "....kwkNNNNNNNNNNNNNkk....",
+            "...kwk.kkkNNNNNNkkkk......",
+            "....k.....kwkkkk..........",
+            "..........kwk.............",
+            "...........k.............."
+        ] },
+        { x: 26, y: 21, rows: [
+            "...........k..........",
+            "..........kwk.........",
+            "..........kwk...k.....",
+            ".......kkkkkkkkkwk....",
+            ".....kknnnnnnnnwk.....",
+            "....knnnnnnnnnnnnk..k.",
+            "...knnnnnnnnnnnnnnkkwk",
+            "..knnnnnnnnnnnnnnnnwk.",
+            ".knnnNNNNNNNNNNnnnnnk.",
+            "knnnNnnnnnnnnnNNNnnnkk",
+            "kNNNNNNNNNNnnnnnNNnnnw",
+            ".kkkkNNNNNNNNNnnnNNnnw",
+            ".....kkkkwkNNNNNNnnNnk",
+            "........kwkwkwkkwNnNNk",
+            ".........kkwkwkwkkkkNn",
+            "...........k.k.k...kNN",
+            "....................kn",
+            ".....................k"
+        ] },
+        { x: 0, y: 34, rows: [
+            "............k.......kkkk..",
+            "...........kwk..kkkknnnnk.",
+            "............kwkknnnnnnnnnk",
+            ".......k...kkknnnnnnnnnnnk",
+            "k.....kwkkknnnnnnnnnnNNNNk",
+            "wk....kwknnnnnnnnNNNNNNNk.",
+            "kwkkkkknnnnnnnNNkkkkkkkk..",
+            "kknnnnnnnnnNNkkk..........",
+            "wnnnnnnnNNkkk.............",
+            "kkNNNkkkkk................",
+            "kwkkk.....................",
+            "wk........................",
+            "k........................."
+        ] },
+        { x: 24, y: 35, rows: [
+            "..kkkk......k...........",
+            ".knnnnkkkk.kwk..........",
+            "knnnnnnnnnkkwk..........",
+            "knnnnnnnnnnnnkk..kk.....",
+            "kNNNNnnnnnnnnnnkkwwk....",
+            ".kNNNNNNNnnnnnnnnkkk...k",
+            "..kkkkkkkkNNNnnnnnnnkkkw",
+            "..........kkkkNNnnnnnnnk",
+            "..............kkkNNnnnnn",
+            ".................kkkkkNk",
+            "......................kw",
+            ".......................k"
+        ] }
+    ],
+    /* oozing stumps left behind */
+    stubs: [
+        { x: 14, y: 27, rows: [
+            "........k...",
+            "......kknk..",
+            "...kkknnnnk.",
+            "..knnnnnnnnk",
+            ".kggnnnnnnk.",
+            "kngggnnnNk..",
+            "kngggNNNk...",
+            ".kNNNkkk....",
+            "..kgk.......",
+            "...g........"
+        ] },
+        { x: 24, y: 27, rows: [
+            ".....kkkk..",
+            "...kknngnk.",
+            "..knnngggnk",
+            ".knnnngggnk",
+            "knnNNNNNNk.",
+            ".kNNNNkgk..",
+            "..kNkk.g...",
+            "...k......."
+        ] },
+        { x: 16, y: 34, rows: [
+            "....kkk...",
+            ".kkknnnk..",
+            "knggnnnnk.",
+            "kngggnnnnk",
+            "kngggnNNk.",
+            ".kNNNNNk..",
+            "..kgkkk...",
+            "...g......"
+        ] },
+        { x: 24, y: 35, rows: [
+            "...kkk....",
+            "..knnnkk..",
+            ".knnnnggk.",
+            "knnnngggnk",
+            ".kNNngggnk",
+            "..kNNNNNk.",
+            "...kkkgk..",
+            "......g..."
+        ] }
+    ]
+};
+/* the player: weed-killer exterminator in a hazmat suit, sprayer tank on the back */
+const HERO = {
+    shears: [
+        ".........kkkkkkk",
+        ".......kkYYYYYYYkk",
+        "......kYYYYYYYYYYYk",
+        ".....kYYYYYYYYYYYYYk",
+        ".....kYYYkkkkkkkkkYk",
+        ".kkk.kYYkLLLkvvvvvkk",
+        "kTTTkkYYkLLkvvWWvvvk",
+        "kTxTkkYYkLLkvvvvvvvk",
+        "kTxTkkOYkLLLkkkkkkkkkk",
+        "kTTTkkOYYkLLLLLLkhhhhhk",
+        "kTTtkYYYYYkkLLLLkhkhkhk............kWk",
+        "kTTtkYYYYYYYkkkkkhhhhhk..........khhhk",
+        "kTTtkYYOYYYYYYYYYkkkkk.........khhhk",
+        "kTTtkYYOYYYYYYYYYkGGGkRRRRRRRkkhhhk",
+        "kTTtkYYOkkkkkkkkkkGGGkkkkkkkkkWhk",
+        ".kkkkYYOOOOOOOOOOkGGGkRRRRRRRkkhhhk",
+        "....kYYYYYYYYYYYYkkkk..........khhhk",
+        "....kkYYYYYkYYYYYk...............khhhk",
+        ".....kYYYYk.kYYYYk.................kWk",
+        ".....kYYYYk.kYYYYk",
+        ".....kOOOOk.kOOOOk",
+        "....kGGGGGk.kGGGGGk",
+        "....kGGGGGGkkGGGGGGk",
+        "....kkkkkkkkkkkkkkkk"
+    ],
+    spray: [
+        ".........kkkkkkk",
+        ".......kkYYYYYYYkk",
+        "......kYYYYYYYYYYYk",
+        ".....kYYYYYYYYYYYYYk",
+        ".....kYYYkkkkkkkkkYk",
+        ".kkk.kYYkLLLkvvvvvkk",
+        "kTTTkkYYkLLkvvWWvvvk",
+        "kTxTkkYYkLLkvvvvvvvk",
+        "kTxTkkOYkLLLkkkkkkkkkk",
+        "kTTTkkOYYkLLLLLLkhhhhhk",
+        "kTTtkYYYYYkkLLLLkhkhkhk",
+        "kTTtkYYYYYYYkkkkkhhhhhk",
+        "kTTtkYYOYYYYYYYYYkkkkk",
+        "kTTtkYYOYYYYYYYYYkGGGkkkkkkkkkkkkkkk",
+        "kTTtkYYOkkkkkkkkkkGGGkHHHHHHHHHHhhggk",
+        ".kkkkYYOOOOOOOOOOkGGGkkkkkkkkkkkkkkk",
+        "....kYYYYYYYYYYYYkkkk",
+        "....kkYYYYYkYYYYYk",
+        ".....kYYYYk.kYYYYk",
+        ".....kYYYYk.kYYYYk",
+        ".....kOOOOk.kOOOOk",
+        "....kGGGGGk.kGGGGGk",
+        "....kGGGGGGkkGGGGGGk",
+        "....kkkkkkkkkkkkkkkk"
+    ]
+};
+/* compose the boss for a damage stage (limbs lost), or a single limb for the falling-off effect */
+function bossRows(stage, ko, limb) {
+    const g = Array.from({ length: BOSS.h }, () => Array(BOSS.w).fill('.'));
+    const put = l => l.rows.forEach((r, y) => Array.from(r).forEach((c, x) => { if (c !== '.') g[l.y + y][l.x + x] = c; }));
+    if (limb !== undefined) put(BOSS.limbs[limb]);
+    else {
+        BOSS.limbs.forEach((l, k) => { if (k >= stage) put(l); });
+        put(BOSS.base);
+        BOSS.stubs.forEach((l, k) => { if (k < stage) put(l); });
+        put(ko ? BOSS.faceKo : BOSS.face);
+    }
+    return g.map(r => r.join(''));
+}
+const SPRITES = {
+    hero: HERO.shears,
+    heroSpray: HERO.spray,
+    slash: [
+        "..........WW",
+        ".........WvvW",
+        "........WvvW",
+        ".......WvvW",
+        "......WvvW",
+        ".....WvvW",
+        "....WvvW",
+        "...WvvW",
+        "..WvvW",
+        ".WvvW",
+        "WvvW"
+    ],
+    star: [
+        "....W....",
+        "....W....",
+        "..W.W.W..",
+        "...WWW...",
+        "WWWWWWWWW",
+        "...WWW...",
+        "..W.W.W..",
+        "....W....",
+        "....W...."
+    ]
+};
+function spriteSVG(rows, px, ko) {
+    const w = Math.max.apply(null, rows.map(r => r.length)), h = rows.length;
+    const colour = ch => (ko && KO_PAL[ch]) || PAL[ch];
+    let rects = '';
+    rows.forEach((row, y) => {
+        let x = 0;
+        while (x < row.length) {
+            const ch = row[x];
+            if (ch === '.') { x++; continue; }
+            const c = colour(ch);
+            let run = 1;
+            while (x + run < row.length && row[x + run] !== '.' && colour(row[x + run]) === c) run++;
+            rects += '<rect x="' + x + '" y="' + y + '" width="' + run + '" height="1" fill="' + c + '"/>';
+            x += run;
+        }
+    });
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' ' + h + '" width="' + (w * px) +
+        '" height="' + (h * px) + '" shape-rendering="crispEdges" role="img" aria-hidden="true">' + rects + '</svg>';
+}
+document.querySelectorAll('.spr').forEach(el => {
+    const d = el.dataset, ko = d.ko === '1';
+    const rows = d.s === 'boss' ? bossRows(+d.stage || 0, ko, d.limb === undefined ? undefined : +d.limb) : SPRITES[d.s];
+    el.innerHTML = spriteSVG(rows, parseFloat(d.px) || 4, ko);
+});
+
+/* ---------- navigation + HUD ---------- */
+const slides = document.querySelectorAll('.slide');
+function currentIndex() {
+    return Array.prototype.findIndex.call(slides, s => s.classList.contains('active'));
+}
+function goSlide(dir) {
+    const cur = currentIndex(), next = cur + dir;
+    if (next < 0 || next >= slides.length) return;
+    slides[cur].classList.remove('active');
+    slides[next].classList.add('active');
+    updateUI();
+}
+const phaseIdx = Array.prototype.map.call(slides, (sl, i) => sl.classList.contains('phase') ? i : -1).filter(i => i >= 0);
+function updateUI() {
+    const i = Math.max(0, currentIndex()), n = slides.length;
+    document.getElementById('current').textContent = i + 1;
+    document.getElementById('total').textContent = n;
+    document.getElementById('progress').style.width = ((i + 1) / n * 100) + '%';
+    document.querySelector('.nav-prev').disabled = i === 0;
+    document.querySelector('.nav-next').disabled = i === n - 1;
+    const passed = phaseIdx.filter(p => p <= i).length;
+    const fill = document.getElementById('hpFill');
+    fill.style.transitionDelay = phaseIdx.indexOf(i) >= 0 ? '1.3s' : '0s';
+    fill.style.width = (100 - 25 * passed) + '%';
+    document.getElementById('hudName').textContent = passed === phaseIdx.length ? 'DARK PINK: DEFEATED' : 'DARK PINK';
+    setScore(i * 500 + passed * 5000);
+    if (i !== lastIdx) { onSlideChange(i, lastIdx); lastIdx = i; }
+}
+
+/* ---------- arcade layer ---------- */
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let lastIdx = -1, fxTimers = [];
+function store(key, val) {
+    try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; }
+}
+
+/* typed headings: wrap each character so it can appear in turn */
+document.querySelectorAll('.slide h2').forEach(h => {
+    const text = h.textContent, esc = ch => ch.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    let c = 0;
+    h.setAttribute('aria-label', text);
+    h.innerHTML = text.split(' ').map(w =>
+        '<span class="w" aria-hidden="true">' + Array.from(w).map(ch => '<span class="ch" style="--c:' + (c++) + '">' + esc(ch) + '</span>').join('') + '</span>'
+    ).join(' ');
+});
+
+/* fight slides: callout text + debris particles */
+const CALLOUTS = ['SNIP!', 'CRITICAL SNIP!', 'WEED KILLER!', 'K.O.!'];
+document.querySelectorAll('.slide.phase').forEach((sl, phaseNo) => {
+    const kind = sl.classList.contains('v-ko') ? 'v-ko' : 'hit';
+    const call = document.createElement('div');
+    call.className = 'callout'; call.textContent = CALLOUTS[phaseNo];
+    sl.querySelector('.arena').appendChild(call);
+    const deb = document.createElement('div');
+    deb.className = 'debris';
+    const cols = ['#ff4fa3', '#4a9a6b', '#b6ff3a', '#c21d7a', '#ffffff'];
+    const n = kind === 'v-ko' ? 26 : 16;
+    for (let k = 0; k < n; k++) {
+        const a = Math.random() * Math.PI * 2, r = 60 + Math.random() * (kind === 'v-ko' ? 180 : 120);
+        const p = document.createElement('i');
+        p.style.cssText = '--dx:' + Math.round(Math.cos(a) * r) + 'px;--dy:' + Math.round(Math.sin(a) * r * 0.7) + 'px;--s:' +
+            (6 + 4 * Math.floor(Math.random() * 3)) + 'px;--c:' + cols[k % cols.length];
+        deb.appendChild(p);
+    }
+    sl.querySelector('.boss-body').appendChild(deb);
+});
+
+/* pixel-dissolve transition */
+const wipe = document.getElementById('wipe'), WCOLS = 24, WROWS = 14;
+wipe.style.setProperty('--cols', WCOLS); wipe.style.setProperty('--rows', WROWS);
+for (let k = 0; k < WCOLS * WROWS; k++) wipe.appendChild(document.createElement('i'));
+function runWipe(dir) {
+    if (reduceMotion) return;
+    Array.prototype.forEach.call(wipe.children, (cell, k) => {
+        const col = k % WCOLS, x = dir < 0 ? (WCOLS - 1 - col) / WCOLS : col / WCOLS;
+        cell.style.setProperty('--d', (0.03 + x * 0.24 + Math.random() * 0.1).toFixed(3) + 's');
+    });
+    wipe.classList.remove('go'); void wipe.offsetWidth; wipe.classList.add('go');
+}
+
+/* score counter */
+let shownScore = 0, scoreRaf = 0;
+function setScore(target) {
+    cancelAnimationFrame(scoreRaf);
+    const from = shownScore, t0 = performance.now();
+    const step = now => {
+        const f = Math.min(1, (now - t0) / 450);
+        shownScore = Math.round(from + (target - from) * f);
+        document.getElementById('score').textContent = String(shownScore).padStart(7, '0');
+        if (f < 1) scoreRaf = requestAnimationFrame(step);
+    };
+    scoreRaf = requestAnimationFrame(step);
+}
+
+/* 8-bit sound effects (WebAudio, off by default) */
+let sfxOn = store('dp-sfx') === 'on', actx = null;
+function tone(freq, dur, at, opts) {
+    opts = opts || {};
+    const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + (at || 0);
+    o.type = opts.type || 'square';
+    o.frequency.setValueAtTime(freq, t);
+    if (opts.to) o.frequency.exponentialRampToValueAtTime(opts.to, t + dur);
+    g.gain.setValueAtTime(opts.vol || 0.05, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, at, vol) {
+    const len = Math.floor(actx.sampleRate * dur), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    for (let k = 0; k < len; k++) d[k] = (Math.random() * 2 - 1) * (1 - k / len);
+    const src = actx.createBufferSource(), g = actx.createGain(), t = actx.currentTime + (at || 0);
+    src.buffer = buf; g.gain.value = vol || 0.08;
+    src.connect(g).connect(actx.destination); src.start(t);
+}
+function sfx(name) {
+    if (!sfxOn) return;
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    if (name === 'nav') { tone(660, 0.05); tone(990, 0.06, 0.05); }
+    if (name === 'back') { tone(990, 0.05); tone(660, 0.06, 0.05); }
+    if (name === 'hit') { noise(0.18, 0, 0.12); tone(320, 0.25, 0, { to: 60, vol: 0.07 }); }
+    if (name === 'ko') { noise(0.35, 0, 0.14); tone(400, 0.5, 0, { to: 40, vol: 0.08 }); }
+    if (name === 'win') [523, 659, 784, 1047, 784, 1047].forEach((f, k) => tone(f, k === 5 ? 0.4 : 0.12, 0.6 + k * 0.12, { vol: 0.045 }));
+    if (name === 'coin') { tone(988, 0.08); tone(1319, 0.35, 0.08); }
+    if (name === 'walk') for (let k = 0; k < 7; k++) tone(220 + k * 40, 0.05, k * 0.45, { type: 'triangle', vol: 0.08 });
+}
+function toggleSfx() {
+    sfxOn = !sfxOn; store('dp-sfx', sfxOn ? 'on' : 'off');
+    document.getElementById('sfxLabel').textContent = 'Sound effects: ' + (sfxOn ? 'on' : 'off') + ' (M)';
+    toast(sfxOn ? 'SOUND ON' : 'SOUND OFF'); sfx('coin');
+}
+function toggleCrt() {
+    const off = document.body.classList.toggle('no-crt'); store('dp-crt', off ? 'off' : 'on');
+    document.getElementById('crtLabel').textContent = 'CRT scanlines: ' + (off ? 'off' : 'on') + ' (C)';
+}
+if (store('dp-crt') === 'off') toggleCrt();
+document.getElementById('sfxLabel').textContent = 'Sound effects: ' + (sfxOn ? 'on' : 'off') + ' (M)';
+function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+}
+
+/* per-slide hooks: wipe, timed sound, KO confetti */
+function onSlideChange(i, prev) {
+    fxTimers.forEach(clearTimeout); fxTimers = [];
+    runWipe(prev < 0 ? 1 : i - prev);
+    if (prev >= 0) sfx(i > prev ? 'nav' : 'back');
+    const sl = slides[i], later = (fn, ms) => fxTimers.push(setTimeout(fn, ms));
+    if (sl.querySelector('.map')) later(() => sfx('walk'), 900);
+    if (!sl.classList.contains('phase')) return;
+    if (sl.classList.contains('v-ko')) {
+        later(() => sfx('ko'), 1500);
+        later(() => { sfx('win'); const r = sl.querySelector('.boss-body').getBoundingClientRect(); fx.burst(r.left + r.width / 2, r.top + r.height / 2, 90); }, 1650);
+    } else {
+        later(() => sfx('hit'), 1150);
+    }
+}
+
+/* petals, stars and bursts on a low-res canvas */
+const fx = (function () {
+    const cv = document.getElementById('fxCanvas'), ctx = cv.getContext('2d'), P = 4;
+    const SHAPES = [[".mm.", "mmmM", "mMM.", ".M.."], ["mm..", "mmM.", ".mMM", "..M."], [".m.", "mmM", ".M."]];
+    const RAINBOW = ['#ff4fa3', '#ffe14a', '#3fd0de', '#9b73ff', '#7dff8a'];
+    let W = 0, H = 0, petals = [], stars = [], parts = [], tick = 0;
+    function resize() {
+        W = cv.width = Math.ceil(innerWidth / P); H = cv.height = Math.ceil(innerHeight / P);
+        stars = Array.from({ length: Math.round(W * H / 900) }, () => ({ x: Math.random() * W | 0, y: Math.random() * H * 0.9 | 0, p: Math.random() * 40 | 0 }));
+    }
+    function petal(top) {
+        return { x: Math.random() * W, y: top ? -6 : Math.random() * H, vy: 0.15 + Math.random() * 0.25, vx: 0.08 + Math.random() * 0.15,
+                 s: Math.random() * SHAPES.length | 0, r: Math.random() * 4 | 0, ph: Math.random() * 6, c: Math.random() * RAINBOW.length | 0 };
+    }
+    function drawShape(rows, x, y, rot, main, dark) {
+        const n = rows.length;
+        for (let a = 0; a < n; a++) for (let b = 0; b < rows[a].length; b++) {
+            const ch = rows[a][b]; if (ch === '.') continue;
+            let px = b, py = a;
+            if (rot === 1) { px = n - 1 - a; py = b; } else if (rot === 2) { px = n - 1 - b; py = n - 1 - a; } else if (rot === 3) { px = a; py = n - 1 - b; }
+            ctx.fillStyle = ch === 'm' ? main : dark;
+            ctx.fillRect((x | 0) + px, (y | 0) + py, 1, 1);
+        }
+    }
+    function frame() {
+        tick++;
+        ctx.clearRect(0, 0, W, H);
+        const dark = document.body.classList.contains('dark-mode'), konami = document.body.classList.contains('konami');
+        if (dark) stars.forEach(s => {
+            const ph = (tick + s.p) % 40;
+            ctx.fillStyle = ph < 3 ? '#ffffff' : 'rgba(191,178,232,0.45)';
+            ctx.fillRect(s.x, s.y, 1, 1);
+            if (ph < 2) { ctx.fillRect(s.x - 1, s.y, 3, 1); ctx.fillRect(s.x, s.y - 1, 1, 3); }
+        });
+        ctx.globalAlpha = dark ? 0.55 : 0.45;
+        petals.forEach(p => {
+            p.y += p.vy; p.x += p.vx + Math.sin(tick * 0.05 + p.ph) * 0.12;
+            if (tick % 12 === 0 && Math.random() < 0.3) p.r = (p.r + 1) % 4;
+            if (p.y > H + 4 || p.x > W + 4) Object.assign(p, petal(true), { x: Math.random() * W * 1.2 - W * 0.2 });
+            const main = konami ? RAINBOW[p.c] : '#ff4fa3', shade = konami ? RAINBOW[(p.c + 1) % RAINBOW.length] : '#c21d7a';
+            drawShape(SHAPES[p.s], p.x, p.y, p.r, main, shade);
+        });
+        ctx.globalAlpha = 1;
+        parts = parts.filter(q => q.life-- > 0);
+        parts.forEach(q => {
+            q.x += q.vx; q.y += q.vy; q.vy += 0.06; q.vx *= 0.985;
+            if (q.shape >= 0) drawShape(SHAPES[q.shape], q.x, q.y, (tick >> 2) % 4, q.c, '#c21d7a');
+            else { ctx.fillStyle = q.c; ctx.fillRect(q.x | 0, q.y | 0, 2, 2); }
+        });
+    }
+    resize();
+    petals = Array.from({ length: 28 }, () => petal(false));
+    addEventListener('resize', resize);
+    if (!reduceMotion) {
+        let last = 0;
+        const loop = now => { if (now - last > 45 && !document.hidden) { last = now; frame(); } requestAnimationFrame(loop); };
+        requestAnimationFrame(loop);
+    }
+    return {
+        burst(cx, cy, n) {
+            if (reduceMotion) return;
+            const cols = ['#ff4fa3', '#ffe14a', '#3fd0de', '#ffffff', '#9b73ff'];
+            for (let k = 0; k < n; k++) {
+                const a = Math.random() * Math.PI * 2, v = 0.6 + Math.random() * 2.2;
+                parts.push({ x: cx / P, y: cy / P, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.6, life: 60 + Math.random() * 50 | 0,
+                             c: cols[k % cols.length], shape: k % 3 === 0 ? k % SHAPES.length : -1 });
+            }
+        }
+    };
+})();
+
+/* keyboard extras: M sound, C scanlines, and the Konami code */
+const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+let kpos = 0;
+document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    kpos = key === KONAMI[kpos] ? kpos + 1 : (key === KONAMI[0] ? 1 : 0);
+    if (kpos === KONAMI.length) {
+        kpos = 0;
+        const on = document.body.classList.toggle('konami');
+        document.getElementById('oneUp').textContent = on ? '30UP' : '1UP';
+        toast(on ? 'KONAMI CODE! +30 LIVES' : 'CHEATS OFF');
+        sfx('coin');
+        if (on) fx.burst(innerWidth / 2, innerHeight / 3, 120);
+        return;
+    }
+    if (key === 'm') toggleSfx();
+    if (key === 'c') toggleCrt();
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); goSlide(1); }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goSlide(-1); }
+});
+slides[0].classList.add('active');
+updateUI();
+const mo = new MutationObserver(updateUI);
+slides.forEach(s => mo.observe(s, { attributes: true, attributeFilter: ['class'] }));
+</script>
+<script>
+// Menu toggle
+function toggleMenu() {
+    const menu = document.getElementById('vizMenu');
+    const toggle = menu.querySelector('.viz-menu-toggle');
+    const isOpen = menu.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', isOpen);
+}
+
+// Close menu on outside click or Escape
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('vizMenu');
+    if (menu && !menu.contains(e.target)) menu.classList.remove('open');
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const menu = document.getElementById('vizMenu');
+        if (menu) menu.classList.remove('open');
+    }
+});
+
+// Theme toggle with persistence
+function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-mode');
+    // localStorage throws (SecurityError) in sandboxed iframes (e.g. Pixelcloud/Collab).
+    // Swallow it so a persistence failure never aborts the rest of this infra script —
+    // an unguarded throw here leaves every [data-animate] element at opacity:0 (blank page).
+    try { localStorage.setItem('visualize-dark-mode', isDark); } catch (e) {}
+    updateThemeLabel();
+}
+function updateThemeLabel() {
+    const isDark = document.body.classList.contains('dark-mode');
+    const icon = document.getElementById('themeIcon');
+    const label = document.getElementById('themeLabel');
+    if (icon) icon.textContent = isDark ? '☀' : '◐';
+    if (label) label.textContent = isDark ? 'Light mode' : 'Dark mode';
+}
+
+// Auto-apply saved theme or system preference.
+// Read once behind try/catch: localStorage access throws in sandboxed iframes, and an
+// unguarded throw here aborts script execution before the scroll-reveal observer below is
+// ever set up — leaving all [data-animate] content hidden (the blank-page failure mode).
+let savedTheme = null;
+try { savedTheme = localStorage.getItem('visualize-dark-mode'); } catch (e) {}
+if (savedTheme === 'true' ||
+    (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.body.classList.add('dark-mode');
+} else if (savedTheme === 'false') {
+    document.body.classList.remove('dark-mode');
+}
+updateThemeLabel();
+
+// Fullscreen toggle
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+        document.exitFullscreen();
+    }
+}
+document.addEventListener('fullscreenchange', function() {
+    const icon = document.getElementById('fsIcon');
+    const label = document.getElementById('fsLabel');
+    const isFs = !!document.fullscreenElement;
+    if (icon) icon.textContent = isFs ? '⛶' : '⛶';
+    if (label) label.textContent = isFs ? 'Exit fullscreen' : 'Fullscreen';
+});
+
+// Scroll-triggered reveal animations
+(function initScrollReveal() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.querySelectorAll('[data-animate]').forEach(function(el) {
+            el.classList.add('is-visible');
+        });
+        return;
+    }
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+                var el = entry.target;
+                var delay = parseInt(el.getAttribute('data-delay') || '0', 10);
+                var duration = el.getAttribute('data-duration');
+                if (duration) el.style.transitionDuration = duration + 'ms';
+                if (delay > 0) {
+                    setTimeout(function() { el.classList.add('is-visible'); }, delay);
+                } else {
+                    el.classList.add('is-visible');
+                }
+                observer.unobserve(el);
+            }
+        });
+    // threshold 0 + a negative bottom rootMargin keys the trigger to the element's top
+    // edge crossing ~85% of the viewport, independent of element height. A ratio-based
+    // threshold cannot work here: an element taller than 1/threshold viewports can never
+    // reach that ratio, so it would stay at opacity:0 forever (the blank-content failure).
+    }, { threshold: 0, rootMargin: '0px 0px -15% 0px' });
+    document.querySelectorAll('[data-animate]').forEach(function(el) {
+        observer.observe(el);
+    });
+
+    // Safety net: a reveal that never fires must degrade to visible, not invisible.
+    // Anything still hidden once the page has settled, but sitting above the fold's
+    // bottom edge, is shown unconditionally. Deferred past the longest plausible
+    // data-delay so the stagger still plays; the standalone timer covers pages where
+    // `load` never fires (a stalled font, image, or CDN script).
+    function revealStalled() {
+        document.querySelectorAll('[data-animate]:not(.is-visible)').forEach(function(el) {
+            if (el.getBoundingClientRect().top < window.innerHeight) {
+                el.classList.add('is-visible');
+            }
+        });
+    }
+    window.addEventListener('load', function() { setTimeout(revealStalled, 1000); });
+    setTimeout(revealStalled, 3000);
+})();
+
+// Slide deck hash navigation (auto-detected)
+// If the page has .slide elements, sync the URL hash with the current slide number.
+// Supports: #3 to jump to slide 3 on load, hash updates on navigation,
+// and hashchange events for manual URL edits.
+// Uses MutationObserver to detect slide changes — works regardless of how
+// navigation is triggered (onclick, keyboard closure, or window.goSlide).
+(function initSlideHash() {
+    var slides = document.querySelectorAll('.slide');
+    if (slides.length < 2) return; // Not a slide deck
+
+    // Track active slide and sync hash via MutationObserver
+    var lastHash = '';
+    function syncHash() {
+        for (var i = 0; i < slides.length; i++) {
+            if (slides[i].classList.contains('active')) {
+                var h = '#' + (i + 1);
+                if (h !== lastHash) {
+                    lastHash = h;
+                    history.replaceState(null, '', h);
+                }
+                return;
+            }
+        }
+    }
+    var observer = new MutationObserver(syncHash);
+    for (var i = 0; i < slides.length; i++) {
+        observer.observe(slides[i], { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // goToSlide: jump directly to slide n (0-indexed)
+    window.goToSlide = function(n) {
+        if (n < 0 || n >= slides.length) return;
+        var active = document.querySelector('.slide.active');
+        if (active) active.classList.remove('active');
+        slides[n].classList.add('active');
+        // Update counter/progress if present
+        var cur = document.getElementById('current');
+        var total = document.getElementById('total');
+        var progress = document.getElementById('progress');
+        if (cur) cur.textContent = n + 1;
+        if (total) total.textContent = slides.length;
+        if (progress) progress.style.width = ((n + 1) / slides.length * 100) + '%';
+        var prevBtn = document.querySelector('.nav-prev');
+        var nextBtn = document.querySelector('.nav-next');
+        if (prevBtn) prevBtn.disabled = n === 0;
+        if (nextBtn) nextBtn.disabled = n === slides.length - 1;
+    };
+
+    // Listen for manual hash changes
+    window.addEventListener('hashchange', function() {
+        var n = parseInt(location.hash.replace('#', ''), 10);
+        if (n >= 1 && n <= slides.length) window.goToSlide(n - 1);
+    });
+
+    // On initial load, jump to hash slide if specified
+    var startHash = parseInt(location.hash.replace('#', ''), 10);
+    if (startHash >= 1 && startHash <= slides.length) {
+        var active = document.querySelector('.slide.active');
+        if (active) active.classList.remove('active');
+        slides[startHash - 1].classList.add('active');
+        // Defer hash write to avoid interfering with page load
+        setTimeout(function() {
+            history.replaceState(null, '', '#' + startHash);
+            var cur = document.getElementById('current');
+            var progress = document.getElementById('progress');
+            if (cur) cur.textContent = startHash;
+            if (progress) progress.style.width = (startHash / slides.length * 100) + '%';
+            var prevBtn = document.querySelector('.nav-prev');
+            var nextBtn = document.querySelector('.nav-next');
+            if (prevBtn) prevBtn.disabled = startHash === 1;
+            if (nextBtn) nextBtn.disabled = startHash === slides.length;
+        }, 0);
+    }
+})();
+
+// Lazy-load html2canvas on first use (avoids unconditional 140KB CDN request)
+function loadHtml2Canvas() {
+    if (typeof html2canvas !== 'undefined') return Promise.resolve();
+    return new Promise(function(resolve, reject) {
+        var script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.integrity = 'sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H';
+        script.crossOrigin = 'anonymous';
+        script.onload = resolve;
+        script.onerror = function() { reject(new Error('html2canvas load failed')); };
+        document.head.appendChild(script);
+    });
+}
+
+// Save as image (full page screenshot via html2canvas)
+//
+// Known html2canvas limitations this function works around:
+// 1. body::before pseudo-elements (gradient backgrounds) — capture .container instead
+// 2. position:fixed elements — captured at wrong position, so capture .container
+// 3. CSS animations with opacity:0 start state — force all to end state before capture
+// 4. Google Fonts loading — wait for document.fonts.ready before capture
+// 5. Canvas size limits — cap scale at 2x for reasonable output size
+// 6. Tainted canvas in iframe contexts (Pixelcloud) — allowTaint must be false so
+//    toDataURL() doesn't throw SecurityError; resources failing CORS are simply omitted
+// 7. Data URL size limits — use toBlob + createObjectURL instead of toDataURL
+// 8. Modern CSS color() function — Chrome 111+ returns color(srgb ...) in computed
+//    styles, which html2canvas 1.4.1 can't parse. Strip in onclone before rendering.
+function saveAsImage() {
+    var btn = document.getElementById('saveImgBtn');
+    var label = btn.querySelector('span:last-child');
+    var origText = label.textContent;
+    label.textContent = 'Loading...';
+    btn.style.pointerEvents = 'none';
+
+    loadHtml2Canvas().then(function() {
+        label.textContent = 'Capturing...';
+        doCapture(btn, label, origText);
+    }).catch(function(err) {
+        console.error('Failed to load html2canvas:', err);
+        label.textContent = origText;
+        btn.style.pointerEvents = '';
+        alert('Could not load screenshot library. Try Print / Save as PDF instead.');
+    });
+}
+
+function doCapture(btn, label, origText) {
+    var menu = document.getElementById('vizMenu');
+    menu.style.display = 'none';
+
+    // 1. Find content container (avoids body::before and fixed-position issues)
+    var target = document.querySelector('.container')
+        || document.querySelector('main')
+        || document.querySelector('[role="main"]')
+        || document.body;
+
+    // 2. Inject override styles: force animated elements to their final visible state,
+    //    disable all transitions/animations so html2canvas sees static content
+    var overrideStyle = document.createElement('style');
+    overrideStyle.id = 'html2canvas-capture-overrides';
+    overrideStyle.textContent = [
+        // Force all animated/transitioning content to be fully visible and static
+        '*, *::before, *::after {',
+        '  animation-play-state: paused !important;',
+        '  animation-delay: 0s !important;',
+        '  animation-duration: 0s !important;',
+        '  transition-duration: 0s !important;',
+        '}',
+        // Common animation class patterns used by /visualize outputs
+        '.ani, .animate-in, [class*="delay-"],',
+        '.d1,.d2,.d3,.d4,.d5,.d6,.d7,.d8,.d9,.d10,',
+        '[data-animate] {',
+        '  opacity: 1 !important;',
+        '  transform: none !important;',
+        '  filter: none !important;',
+        '}',
+        // Keep the menu panel hidden during capture
+        '.viz-menu-panel { opacity: 0 !important; pointer-events: none !important; }',
+    ].join('\n');
+    document.head.appendChild(overrideStyle);
+
+    // 3. Give the target a solid background (body::before gradients won't be captured)
+    var origBg = target.style.background;
+    if (target !== document.body) {
+        target.style.background = getComputedStyle(document.body).backgroundColor || '#ffffff';
+    }
+
+    // 4. Scroll to top
+    var scrollPos = window.scrollY;
+    window.scrollTo(0, 0);
+
+    // 5. Wait for fonts to load, then capture
+    var capture = function() {
+        // Force layout recalc after style overrides
+        void target.offsetHeight;
+
+        // Patch window.getComputedStyle to convert CSS color() values to rgba().
+        // html2canvas 1.4.1 can't parse color() — Chrome 111+ uses it in
+        // computed styles. html2canvas uses the MAIN window's getComputedStyle
+        // (not the cloned iframe's), so we must patch it here.
+        // Restored in .finally() below.
+        var origGCS = window.getComputedStyle;
+        if (typeof Proxy !== 'undefined') {
+            var cvs = document.createElement('canvas');
+            cvs.width = cvs.height = 1;
+            var ctx = cvs.getContext('2d');
+            function fixColor(val) {
+                if (typeof val !== 'string' || val.indexOf('color(') === -1) return val;
+                ctx.clearRect(0, 0, 1, 1);
+                ctx.fillStyle = 'rgba(0,0,0,0)';
+                ctx.fillStyle = val;
+                ctx.fillRect(0, 0, 1, 1);
+                var d = ctx.getImageData(0, 0, 1, 1).data;
+                return 'rgba(' + d[0] + ',' + d[1] + ',' + d[2] + ',' + (d[3] / 255).toFixed(3) + ')';
+            }
+            window.getComputedStyle = function(el, pseudo) {
+                var style = origGCS.call(this, el, pseudo);
+                return new Proxy(style, {
+                    get: function(target, prop) {
+                        if (prop === 'getPropertyValue') {
+                            return function(name) { return fixColor(target.getPropertyValue(name)); };
+                        }
+                        var v = target[prop];
+                        if (typeof v === 'function') return v.bind(target);
+                        return fixColor(v);
+                    }
+                });
+            };
+        }
+
+        html2canvas(target, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: false,
+            logging: false,
+            onclone: function(clonedDoc) {
+                // In the cloned document, ensure all elements are visible
+                var els = clonedDoc.querySelectorAll('.ani, .animate-in, [class*="delay-"], [data-animate]');
+                for (var i = 0; i < els.length; i++) {
+                    els[i].style.opacity = '1';
+                    els[i].style.transform = 'none';
+                    els[i].style.filter = 'none';
+                }
+            }
+        }).then(function(canvas) {
+            var filename = (document.title || 'visualization') + '.png';
+            // Use toBlob + createObjectURL instead of toDataURL to avoid:
+            // - Data URL size limits (~2MB in Chrome)
+            // - Silent failures with <a download>.click() in sandboxed iframes
+            canvas.toBlob(function(blob) {
+                if (!blob) {
+                    alert('Screenshot failed. Try Print / Save as PDF instead.');
+                    return;
+                }
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement('a');
+                link.download = filename;
+                link.href = url;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                // Revoke after a short delay to ensure download starts
+                setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+            }, 'image/png');
+        }).catch(function(err) {
+            console.error('Screenshot failed:', err);
+            alert('Screenshot failed. Try Print / Save as PDF instead.');
+        }).finally(function() {
+            // Restore everything
+            window.getComputedStyle = origGCS;
+            overrideStyle.remove();
+            target.style.background = origBg;
+            menu.style.display = '';
+            label.textContent = origText;
+            btn.style.pointerEvents = '';
+            menu.classList.remove('open');
+            window.scrollTo(0, scrollPos);
+        });
+    };
+
+    // Use Font Loading API if available, otherwise fall back to timeout
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function() {
+            setTimeout(capture, 50);
+        });
+    } else {
+        setTimeout(capture, 500);
+    }
+}
+</script>
+</body>
+</html>
