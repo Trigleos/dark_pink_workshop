@@ -706,7 +706,7 @@ body.konami #hpFill { background: linear-gradient(90deg, #ff4fa3, #ffe14a, #3fd0
 <section class="slide">
     <div class="tag rv" style="--i:0">WORKSHOP</div>
     <h1 class="rv glitch" style="--i:1" data-text="DARK PINK">DARK PINK</h1>
-    <p class="sub rv" style="--i:2">Reversing a Southeast Asian APT attack chain, from malicious ISO to a live Telegram bot to a YARA hunt.</p>
+    <p class="sub rv" style="--i:2">Reversing a Southeast Asian APT attack chain, from malicious ISO to the operator's messages on a live Telegram bot.</p>
     <p class="sub rv" style="--i:3">Flare VM &middot; CFF Explorer &middot; Procmon &middot; Ghidra &middot; dnSpy &middot; VirusTotal</p>
     <div class="stage-art rv" style="--i:4">
         <div class="hero-col"><span class="spr" data-s="hero" data-px="7"></span><span class="cap">YOU</span></div>
@@ -743,7 +743,7 @@ body.konami #hpFill { background: linear-gradient(90deg, #ff4fa3, #ffe14a, #3fd0
         <ul class="pts rv" style="--i:2">
             <li><b>Module 1: Initial loader.</b> ISO, wwlib.dll side-loading, persistence, the BuildTask payloads</li>
             <li><b>Module 2: KamiKakaBot.</b> The infostealer and the backdoor in dnSpy</li>
-            <li><b>Module 3: Telegram C2.</b> Hunt a live bot, extract its messages, hunt with YARA on VirusTotal</li>
+            <li><b>Module 3: Telegram C2.</b> Hunt a live bot and extract its messages</li>
             <li>Each module has hands-on labs; LLM-assisted analysis is practised in Module 1</li>
         </ul>
         <div class="panel rv" style="--i:3">
@@ -751,7 +751,7 @@ body.konami #hpFill { background: linear-gradient(90deg, #ff4fa3, #ffe14a, #3fd0
             <div class="chips">
                 <span class="chip">CFF Explorer</span><span class="chip">Procmon</span><span class="chip">Ghidra</span><span class="chip">dnSpy</span>
                 <span class="chip">Detect It Easy</span><span class="chip">Python</span><span class="chip">Telegram Bot API</span>
-                <span class="chip">YARA</span><span class="chip">VirusTotal</span>
+                <span class="chip">VirusTotal</span>
             </div>
         </div>
     </div>
@@ -806,7 +806,7 @@ body.konami #hpFill { background: linear-gradient(90deg, #ff4fa3, #ffe14a, #3fd0
 <section class="slide">
     <div class="tag rv" style="--i:0">OVERVIEW</div>
     <h2 class="rv" style="--i:1">THE ATTACK CHAIN WE WILL TAKE APART</h2>
-    <p class="sub rv" style="--i:2">Eight labs along the chain. By the end you will have followed the whole path, hunted the live bot and tuned a YARA rule.</p>
+    <p class="sub rv" style="--i:2">Seven labs along the chain. By the end you will have followed the whole path and read the operator's messages on the live bot.</p>
     <div class="map rv" style="--i:3">
         <span class="walker spr" data-s="hero" data-px="2.5"></span>
         <div class="lvl" data-w="1" style="--k:0"><div class="tile">1-1<span class="star">&#9733;</span></div><span class="world">MODULE 1</span><span class="name">Phishing ISO</span></div>
@@ -814,8 +814,8 @@ body.konami #hpFill { background: linear-gradient(90deg, #ff4fa3, #ffe14a, #3fd0
         <div class="lvl" data-w="1" style="--k:2"><div class="tile">1-3<span class="star">&#9733;</span></div><span class="world">MODULE 1</span><span class="name">Drop + persist</span></div>
         <div class="lvl" data-w="1" style="--k:3"><div class="tile">1-4<span class="star">&#9733;</span></div><span class="world">MODULE 1</span><span class="name">BuildTask payloads</span></div>
         <div class="lvl" data-w="2" style="--k:4"><div class="tile">2-1<span class="star">&#9733;</span></div><span class="world">MODULE 2</span><span class="name">Infostealer + backdoor</span></div>
-        <div class="lvl" data-w="3" style="--k:5"><div class="tile">3-1<span class="star">&#9733;</span></div><span class="world">MODULE 3</span><span class="name">Live bot + messages</span></div>
-        <div class="lvl" data-w="3" style="--k:6"><div class="tile boss-tile"><span class="spr" data-s="boss" data-px="1"></span><span class="star">&#9733;</span></div><span class="world">MODULE 3</span><span class="name">YARA on VirusTotal</span></div>
+        <div class="lvl" data-w="3" style="--k:5"><div class="tile">3-1<span class="star">&#9733;</span></div><span class="world">MODULE 3</span><span class="name">Hunt the live bot</span></div>
+        <div class="lvl" data-w="3" style="--k:6"><div class="tile boss-tile"><span class="spr" data-s="boss" data-px="1"></span><span class="star">&#9733;</span></div><span class="world">MODULE 3</span><span class="name">Operator's messages</span></div>
     </div>
     <div class="chain rv" style="--i:4">
         <span class="chip w1">Module 1</span><span class="chip w2">Module 2</span><span class="chip w3">Module 3</span>
@@ -1036,7 +1036,7 @@ payload 2: backdoor
 <section class="slide phase v-beam" style="--f:0.5;--t:0.25">
     <div class="tag rv" style="--i:0">PHASE 3 OF 4</div>
     <h2 class="rv" style="--i:1">MODULE 3: TELEGRAM C2 AND HUNTING</h2>
-    <p class="sub rv" style="--i:2">Live bot hunting, message extraction and YARA hunting on VirusTotal</p>
+    <p class="sub rv" style="--i:2">Live bot hunting and message extraction</p>
     <div class="arena">
         <div class="p-hero"><div class="hero-inner"><span class="spr" data-s="heroSpray" data-px="6"></span></div></div>
         <div class="beam"></div>
@@ -1117,29 +1117,6 @@ payload 2: backdoor
     </div>
 </section>
 
-<!-- 16 YARA + VT -->
-<section class="slide">
-    <div class="tag rv" style="--i:0">MODULE 3 &middot; HUNTING</div>
-    <h2 class="rv" style="--i:1">HUNTING WITH YARA ON VIRUSTOTAL</h2>
-    <div class="cols">
-        <div>
-            <ul class="pts rv" style="--i:2">
-                <li>You get a starter YARA rule: fill it with candidate strings from your own analysis</li>
-                <li>Good strings are ones the author is unlikely to change; a single token, or a string found in clean files, is not</li>
-                <li>Test on VirusTotal: too many hits means too generic, one hit means too specific</li>
-            </ul>
-            <div class="lab rv" style="--i:3"><span class="k">LAB 8</span>Fill the starter rule with strings from Labs 1 to 7, decide which are best to hunt on, and test your rule on VirusTotal.</div>
-        </div>
-        <div class="panel rv" style="--i:4">
-            <h3>FOR EACH STRING</h3>
-<pre class="code">stable across samples?  y/n
-in clean files?         y/n
-VirusTotal hits         n
-keep?                   y/n</pre>
-        </div>
-    </div>
-</section>
-
 <!-- PHASE 4 -->
 <section class="slide phase v-ko" style="--f:0.25;--t:0.0">
     <div class="tag rv" style="--i:0">PHASE 4 OF 4</div>
@@ -1170,7 +1147,6 @@ keep?                   y/n</pre>
             <li>Persistence and the BuildTask that rebuilds KamiKakaBot</li>
             <li>KamiKakaBot: the infostealer's target browsers and the backdoor's token and chat ID</li>
             <li>Telegram C2: hunted a live bot and extracted its messages</li>
-            <li>Hunting on VirusTotal with a YARA rule you tuned yourself</li>
         </ul>
         <div class="boss-col boss rv" style="--i:3"><span class="spr" data-s="boss" data-stage="4" data-ko="1" data-px="6"></span><span class="cap">ATTACK CHAIN SOLVED</span></div>
     </div>
