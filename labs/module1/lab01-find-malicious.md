@@ -33,15 +33,11 @@ Mount the phishing ISO, look at every file in CFF Explorer, check the hashes, an
 7. Look at the imports of the `.docx.exe` in CFF Explorer (**Import Directory**). Is the suspicious DLL there?
 8. If it is not, work out how the EXE loads it anyway.
 
-> TODO: add any extra steps or screenshots you want for CFF Explorer
-
 ## Questions
 
 - [ ] Which files are visible, and which are hidden?
 - [ ] What is the `.docx.exe` really?
 - [ ] Which file is malicious?
-- [ ] Why does checking the import table not show the malicious DLL?
-- [ ] What might the hidden `.doc` be for?
 
 ## Hints
 
@@ -64,12 +60,29 @@ A DLL does not have to be in the import table to be loaded. Search the EXE for t
 <details>
 <summary>Show solution</summary>
 
-> TODO: add screenshots and notes
+### Which files are visible, and which are hidden?
 
-<!-- ![Hidden files](img/lab01-dir.png) -->
-<!-- ![CFF Explorer hashes](img/lab01-cff-hashes.png) -->
-<!-- ![VirusTotal: WINWORD.EXE](img/lab01-vt-winword.png) -->
-<!-- ![Import Directory without wwlib.dll](img/lab01-imports.png) -->
+- Visible: doxc.exe and .pdf
+- Hidden: .doc and .dll
+
+### What is the `.docx.exe` really?
+
+Search the hashes on VirusTotal to find out that the docx.exe file is only a renamed winword.exe file:
+
+[Executable Signature](img/signed.PNG)
+
+### Which file is malicious?
+
+wwlib.dll is. You can look at the imports of the .docx.exe file but it does not directly import the library. To find out how it is loaded, you to open the executable in Ghidra and search for the string "wwlib.dll" to find out where it's used by searching for references to the string (CTRL + SHIFT + F for Ghidra/X for Ida).
+
+[wwlib.dll](img/wwlib.PNG)
+
+This function uses the wwlib.dll string and calls LoadLibraryExW to set up the DLL and use it.
+
+[LoadLibrary](img/LoadLibrary.PNG)
+
+
+Alternatively, simply google wwlib.dll and see that it's used in conjunction with winword.
 
 </details>
 
