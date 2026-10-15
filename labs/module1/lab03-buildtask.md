@@ -88,7 +88,7 @@ Following this, the payload, which is a ZIP archive, is decompressed and the fil
 
 ![ZIP decompress](img/zip_decompress.PNG)
 
-You can decode both payloads using the Python scripts decode1.py and decode2.py in the scripts folder.
+You can decode both payloads with the Python scripts [decode1.py](scripts/decode1.py) and [decode2.py](scripts/decode2.py).
 
 ### What are the two payloads?
 

@@ -10,6 +10,7 @@ Mount the phishing ISO, look at every file in CFF Explorer, check the hashes, an
 
 - Windows Explorer (mount), `cmd` or PowerShell
 - CFF Explorer
+- Ghidra (optional, to see how the DLL is loaded)
 - VirusTotal (in the browser on your host)
 
 ## You need
@@ -62,7 +63,7 @@ A DLL does not have to be in the import table to be loaded. Search the EXE for t
 
 ### Which files are visible, and which are hidden?
 
-- Visible: doxc.exe and .pdf
+- Visible: .docx.exe and .pdf
 - Hidden: .doc and .dll
 
 ### What is the `.docx.exe` really?
@@ -73,7 +74,7 @@ Search the hashes on VirusTotal to find out that the docx.exe file is only a ren
 
 ### Which file is malicious?
 
-wwlib.dll is. You can look at the imports of the .docx.exe file but it does not directly import the library. To find out how it is loaded, you to open the executable in Ghidra and search for the string "wwlib.dll" to find out where it's used by searching for references to the string (CTRL + SHIFT + F for Ghidra/X for Ida).
+wwlib.dll is. You can look at the imports of the .docx.exe file but it does not directly import the library. To find out how it is loaded, you need to open the executable in Ghidra and search for the string "wwlib.dll" to find out where it's used by searching for references to the string (CTRL + SHIFT + F for Ghidra/X for Ida).
 
 ![wwlib.dll](img/wwlib.PNG)
 

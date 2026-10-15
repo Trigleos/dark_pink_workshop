@@ -66,7 +66,7 @@ If we provide that to our decoding algorithm, we get the bot token back:
 
 ![Decoded Token](img/decoded_token.PNG)
 
-The script I used can be found in the scripts folder.
+The script I used is [decode_token.py](scripts/decode_token.py).
 
 ### Which chat ID does it report to?
 

@@ -17,15 +17,16 @@ Work out what `wwlib.dll` does: which files it drops, where it stores them and h
 
 ## Route A: Procmon
 
-1. Copy the ISO contents into a working folder.
-2. Start Procmon
-3. Run the `.docx.exe` and wait a few seconds, then stop the capture.
-4. Set filters:
+1. Take a snapshot.
+2. Copy the ISO contents into a working folder.
+3. Start Procmon.
+4. Run the `.docx.exe` and wait a few seconds, then stop the capture.
+5. Set filters:
    - **Process Name** is the `.docx.exe` file name, plus any child processes it starts (use **Tools > Process Tree** afterwards)
    - **Operation** is `CreateFile`, `WriteFile` or `RegSetValue`
    - Also look at process events
-5. Read the file writes and registry changes. Note every path.
-6. Check the files on disk and the persistence you found, then revert the snapshot.
+6. Read the file writes and registry changes. Note every path.
+7. Check the files on disk and the persistence you found, then revert the snapshot.
 
 ## Route B: Ghidra and an LLM
 
