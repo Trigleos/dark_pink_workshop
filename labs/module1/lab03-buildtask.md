@@ -48,7 +48,7 @@ BuildTask (MSBuild project)
 <details>
 <summary>Hint 1</summary>
 
-> TODO
+Search for the variable ggR___UYwTa and see how it is used to decode the payloads.
 
 </details>
 
