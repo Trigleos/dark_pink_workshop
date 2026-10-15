@@ -16,37 +16,25 @@ Get the operator's messages out of the C2 chat and into a chat you control, usin
 
 - From Lab 5: the bot token and the chat ID
 - From Lab 6: the bot username
+- A Telegram account
 
 ## Steps
 
 1. Read through the list of available methods in the Bot API documentation.
 2. Find the methods that let a bot read or move messages in a chat it belongs to. Note what each one needs.
-3. Rule out methods that would disturb the backdoor or tip off the operator on a real case.
-4. Use the method you picked to get the operator's messages into a chat you control.
-5. Read the messages in order.
-
-> TODO: add any setup attendees need
+3. Use the method you picked to get the operator's messages into a chat you control.
+4. Read the messages in order.
 
 ## Questions
 
-- [ ] Which methods did you consider, and which did you use?
-- [ ] Why did you rule out the others?
-- [ ] How many messages did you recover?
-- [ ] What did the operator send, and what came back from the victim?
+- [ ] Which flag is hidden in the C2 channel
 
 ## Hints
 
 <details>
 <summary>Hint 1</summary>
 
-Look for a method that copies an existing message from one chat to another, given its message ID.
-
-</details>
-
-<details>
-<summary>Hint 2</summary>
-
-> TODO
+Look for a method that forwards an existing message from one chat to another, given its message ID.
 
 </details>
 
@@ -55,9 +43,14 @@ Look for a method that copies an existing message from one chat to another, give
 <details>
 <summary>Show solution</summary>
 
-> TODO: add screenshots and notes
+First start a chat with the bot by searching for the bot username you found earlier.
 
-<!-- ![First recovered message](img/lab07-first-message.png) -->
-<!-- ![Recovered history](img/lab07-history.png) -->
+Retrieve your own user ID by starting a chat with @UserIDToBot
+
+Visit https://api.telegram.org/forwardMesssage?from_chat_id=6961114674&chat_id=your_own_id&message_id=1
+
+The message will be forwarded to your chat with the bot.
+
+Increase the message id to forward the following messages.
 
 </details>
