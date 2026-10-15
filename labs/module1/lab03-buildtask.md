@@ -57,18 +57,48 @@ BuildTask (MSBuild project)
 <details>
 <summary>Show solution</summary>
 
-> TODO: add the reference scripts, screenshots and notes
+### What starts MSBuild, and with which project file?
 
-```python
-# TODO: rebuild payload 1
+MSBuild is started by the persistence mechanism which we uncovered in the previous lab, abusing the Winlogon registry key:
+
+![Winlogon Key](img/winlogon.PNG)
+
+The command run by the command set in the Shell key relies on multiple environment variables which are:
+
+![Environment registry](img/registry.PNG)
+
+This makes the full command:
+
+```powershell
+explorer.exe, explorer.exe /e,/root,powershell -nop -w h "Start-Process -N -F C:\Windows\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe -A C:\Users\...\AppData\Local\Temp\wctA91F.tmp"
 ```
 
-```python
-# TODO: rebuild payload 2
-```
+### Where are the two payloads stored, and how are they encoded?
 
-<!-- ![Inline task](img/lab03-inline-task.png) -->
-<!-- ![Rebuilt payloads](img/lab03-payloads.png) -->
+First payload is stored in variable qKd__ZXAKK_o and XOR encoded, the decode loop uses a hardcoded key:
+
+![First XOR decode](img/first_xor_decode.PNG)
+![XOR key](img/key.PNG)
+
+Second payload is stored in variable VXpdZApwL_DgJ__, base64 encoded and XORed with the same key:
+
+![Second XOR decode](img/second_xor_decode.PNG)
+
+Following this, the payload, which is a ZIP archive, is decompressed and the file extracted:
+
+![ZIP decompress](img/zip_decompress.PNG)
+
+You can decode both payloads using the Python scripts decode1.py and decode2.py in the solution folder.
+
+### What are the two payloads?
+
+First payload is a .NET assembly
+
+Second payload is a ZIP file that contains a .NET assembly
+
+###  Why does running code through MSBuild help the attacker?
+
+MSBuild is a trusted executable and using it allows the attackers to run their decoded payloads in memory without leaving a file on disk. They are using a LOLBAS (Living Off the Land binary) [Msbuild LOLBAS](https://lolbas-project.github.io/lolbas/Binaries/Msbuild/)
 
 </details>
 
