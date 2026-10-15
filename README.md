@@ -10,3 +10,5 @@ Open `index.html` in a browser (needs internet for Google Fonts; falls back to m
 - There may be a cheat code.
 
 The lab sample is the real Dark Pink ISO (Telegram bot token revoked, so no C2). Lab 3 uses a trainer-edited BuildTask with a working bot (separate 7z, password = the BuildTask file name found in Lab 2); Module 3 hunts that bot. The BuildTask archive is `build_task.7z` in the workshop repo. Lab guides (with solutions) are Markdown files in `labs/`, one per lab; screenshots go in each module's `img/` folder.
+
+The password for the workshop.7z file is "sinconworkshop2026"
