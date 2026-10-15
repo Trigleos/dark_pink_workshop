@@ -56,6 +56,6 @@ We can write a very short Python script or ask an LLM to write it for us to deco
 
 ![Decoded Browsers](img/browser_decode.PNG)
 
-The script I used is in the scripts folder.
+The script I used is [xor_decode.py](scripts/xor_decode.py).
 
 </details>

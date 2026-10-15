@@ -45,4 +45,4 @@ SHA-256 `24a09c8f281ad20ff9a13e4a94110c74ad73de26319f8f19a34a4da8cf47448e`
 
 Each lab has the same sections: goal, tools, what you need from earlier labs, steps, questions, hints, solution and what to carry into the next lab. Hints and solutions are folded; click to open them.
 
-Screenshots live in each module's `img/` folder, named `labNN-<what>.png`.
+Screenshots live in each module's `img/` folder and solution scripts in its `scripts/` folder.

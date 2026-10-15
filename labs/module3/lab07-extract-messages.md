@@ -27,7 +27,7 @@ Get the operator's messages out of the C2 chat and into a chat you control, usin
 
 ## Questions
 
-- [ ] Which flag is hidden in the C2 channel
+- [ ] Which flag is hidden in the C2 channel?
 
 ## Hints
 

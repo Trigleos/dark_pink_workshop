@@ -744,7 +744,7 @@ body.konami #hpFill { background: linear-gradient(90deg, #ff4fa3, #ffe14a, #3fd0
             <li><b>Module 1: Initial loader.</b> ISO, wwlib.dll side-loading, persistence, the BuildTask payloads</li>
             <li><b>Module 2: KamiKakaBot.</b> The infostealer and the backdoor in dnSpy</li>
             <li><b>Module 3: Telegram C2.</b> Hunt a live bot and extract its messages</li>
-            <li>Each module has hands-on labs; LLM-assisted analysis is practised in Module 1</li>
+            <li>Each module has hands-on labs; LLM-assisted analysis is practised in Modules 1 and 2</li>
         </ul>
         <div class="panel rv" style="--i:3">
             <h3>TOOLS (FLARE VM)</h3>
@@ -911,7 +911,7 @@ Ask:      explain, then give a
           Python decoder
 Verify:   check it against what
           you saw on disk</pre>
-            <div class="chips"><span class="chip">Used in Labs 2 and 3</span></div>
+            <div class="chips"><span class="chip">Used in Labs 2 to 5</span></div>
         </div>
     </div>
 </section>
@@ -1085,11 +1085,12 @@ payload 2: backdoor
                 <li>The token and chat ID you recovered in Lab&nbsp;5 are live: the same access as the malware to the bot, its chat and its messages</li>
                 <li>On a real case, think before you query: calls like getUpdates compete with the backdoor's own polling and can tip off the operator</li>
             </ul>
-            <div class="lab rv" style="--i:3"><span class="k">LAB 6</span>Take the bot token from Lab 5 and identify the bot from your host with getMe.</div>
+            <div class="lab rv" style="--i:3"><span class="k">LAB 6</span>Take the bot token and chat ID from Lab 5 and, from your host, identify the bot with getMe and the person in its chat with getChat.</div>
         </div>
         <div class="panel rv" style="--i:4">
             <h3>BOT API CALLS</h3>
-<pre class="code">getMe    who is the bot?</pre>
+<pre class="code">getMe    who is the bot?
+getChat  who is in its chat?</pre>
         </div>
     </div>
 </section>
