@@ -47,7 +47,7 @@ First start a chat with the bot by searching for the bot username you found earl
 
 Retrieve your own user ID by starting a chat with @UserIDToBot
 
-Visit https://api.telegram.org/bot8929583362:AAEe5cG_z6Rusg8YGL-vvFJloILbzz-eBCA/forwardMessage?from_chat_id=6961114674&chat_id=your_own_id&message_id=1
+Visit https://api.telegram.org/bot<TOKEN>/forwardMessage?from_chat_id=6961114674&chat_id=your_own_id&message_id=1
 
 The message will be forwarded to your chat with the bot.
 
