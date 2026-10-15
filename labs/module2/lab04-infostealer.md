@@ -41,7 +41,7 @@ The class q10mvh3 is the one that interests us. Throw it into an LLM to XOR deco
 
 The function we are interested in base64 decoded a couple of strings:
 
-![Infostealer Function](img/infostealer_function.png)
+![Infostealer Function](img/infostealer_function.PNG)
 
 The strings decode to:
 
@@ -54,7 +54,7 @@ Both decoded strings are part of the path to the targeted browsers, so we need t
 
 We can write a very short Python script or ask an LLM to write it for us to decode the strings and we get three browsers:
 
-![Decoded Browsers](img/browsers_decoded.PNG)
+![Decoded Browsers](img/browser_decode.PNG)
 
 The script I used is in the scripts folder.
 
