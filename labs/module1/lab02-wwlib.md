@@ -17,19 +17,20 @@ Work out what `wwlib.dll` does: which files it drops, where it stores them and h
 
 ## Route A: Procmon
 
-1. Take a snapshot.
-2. Copy the ISO contents into a working folder.
-3. Start Procmon and set filters:
+1. Copy the ISO contents into a working folder.
+2. Start Procmon
+3. Run the `.docx.exe` and wait a few seconds, then stop the capture.
+4. Set filters:
    - **Process Name** is the `.docx.exe` file name, plus any child processes it starts (use **Tools > Process Tree** afterwards)
    - **Operation** is `CreateFile`, `WriteFile` or `RegSetValue`
-4. Run the `.docx.exe` and wait a few seconds, then stop the capture.
+   - Also look at process events
 5. Read the file writes and registry changes. Note every path.
 6. Check the files on disk and the persistence you found, then revert the snapshot.
 
 ## Route B: Ghidra and an LLM
 
 1. Import `wwlib.dll` into Ghidra and run auto-analysis.
-2. Start from `DllMain` and the exports, and find the two main functions that do the work.
+2. Start from interesting imports, work your way back using cross-references, and find the two main functions that do the work.
 3. Give each function's pseudo-C to an LLM, one at a time, using the prompt pattern from the deck:
 
    ```text
@@ -39,26 +40,24 @@ Work out what `wwlib.dll` does: which files it drops, where it stores them and h
    Verify:  I will check the paths against the strings and the files on disk
    ```
 
-4. Rename the functions and variables in Ghidra as you go.
-5. Check each answer: look the paths and keys up in the strings and confirm them.
-
-> TODO: add the names or addresses of the two main functions if you want to give attendees a head start
+4. Check each answer: look the paths and keys up in the strings and confirm them.
 
 ## Questions
 
-- [ ] What do the two main functions do?
 - [ ] Which files are dropped, and where?
-- [ ] What happens to the hidden `.doc` from the ISO?
 - [ ] How does the malware persist?
 - [ ] What is the BuildTask (MSBuild project) file called?
-- [ ] What does the victim see while all this happens?
+
+Extra questions for the reverse engineers:
+- [ ] What do the two main functions do?
+- [ ] What happens to the hidden `.doc` from the ISO?
 
 ## Hints
 
 <details>
-<summary>Hint 1</summary>
+<summary>Hint for reversing</summary>
 
-> TODO
+Look at function FUN_1800034e0 and check which functions it calls.
 
 </details>
 
@@ -67,12 +66,23 @@ Work out what `wwlib.dll` does: which files it drops, where it stores them and h
 <details>
 <summary>Show solution</summary>
 
-> TODO: add screenshots and notes for both routes
+After running procmon and filtering for the correct events such as file creations, we can see the following activity:
 
-<!-- ![Procmon file writes](img/lab02-procmon.png) -->
-<!-- ![Persistence](img/lab02-persistence.png) -->
-<!-- ![Ghidra: main function 1](img/lab02-ghidra-1.png) -->
-<!-- ![Ghidra: main function 2](img/lab02-ghidra-2.png) -->
+![Procmon Results](img/procmon.PNG)
+
+### Which files are dropped, and where?
+
+The file C:\Users\...\AppData\Local\Temp\wctA91F.tmp is dropped.
+
+### How does the malware persist?
+
+Persistence is achieved with the registry key HKCU\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell which is set to "explorer.exe, explorer.exe /e,/root,%Pyps% -nop -w h "Start-Process -N -F $env:Msbd -A $env:Temprd""
+
+Furthermore, the registry values Pyps, Msbd, and Temprd are set to "powershell", "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe", and "C:\Users\...\AppData\Local\Temp\wctA91F.tmp" respectively.
+
+### What is the BuildTask (MSBuild project) file called?
+
+It is called wctA91F.tmp
 
 </details>
 
