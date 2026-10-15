@@ -69,17 +69,17 @@ A DLL does not have to be in the import table to be loaded. Search the EXE for t
 
 Search the hashes on VirusTotal to find out that the docx.exe file is only a renamed winword.exe file:
 
-[Executable Signature](img/signed.PNG)
+![Executable Signature](img/signed.PNG)
 
 ### Which file is malicious?
 
 wwlib.dll is. You can look at the imports of the .docx.exe file but it does not directly import the library. To find out how it is loaded, you to open the executable in Ghidra and search for the string "wwlib.dll" to find out where it's used by searching for references to the string (CTRL + SHIFT + F for Ghidra/X for Ida).
 
-[wwlib.dll](img/wwlib.PNG)
+![wwlib.dll](img/wwlib.PNG)
 
 This function uses the wwlib.dll string and calls LoadLibraryExW to set up the DLL and use it.
 
-[LoadLibrary](img/LoadLibrary.PNG)
+![LoadLibrary](img/LoadLibrary.PNG)
 
 
 Alternatively, simply google wwlib.dll and see that it's used in conjunction with winword.
