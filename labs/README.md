@@ -1,6 +1,6 @@
 # Dark Pink workshop: lab guides
 
-Eight hands-on labs that follow the attack chain from the phishing ISO to a YARA rule. Each lab builds on the previous one, so work through them in order.
+Seven hands-on labs that follow the attack chain from the phishing ISO to the operator's messages on the live bot. Each lab builds on the previous one, so work through them in order.
 
 ## Before you start
 
@@ -40,7 +40,6 @@ SHA-256 `24a09c8f281ad20ff9a13e4a94110c74ad73de26319f8f19a34a4da8cf47448e`
 | [5](module2/lab05-backdoor.md) | 2: KamiKakaBot | The backdoor: the bot token and chat ID |
 | [6](module3/lab06-hunt-bot.md) | 3: Telegram C2 and hunting | Hunting the live bot: identify it with the token |
 | [7](module3/lab07-extract-messages.md) | 3: Telegram C2 and hunting | Extracting the messages through the Bot API |
-| [8](module3/lab08-yara-vt.md) | 3: Telegram C2 and hunting | Hunting with YARA on VirusTotal |
 
 ## Layout
 

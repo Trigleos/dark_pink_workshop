@@ -1,6 +1,6 @@
 # Lab 7: Extracting the messages
 
-**Module 3: Telegram C2 and hunting** · [All labs](../README.md) · Previous: [Lab 6](lab06-hunt-bot.md) · Next: [Lab 8](lab08-yara-vt.md)
+**Module 3: Telegram C2 and hunting** · [All labs](../README.md) · Previous: [Lab 6](lab06-hunt-bot.md)
 
 ## Goal
 
